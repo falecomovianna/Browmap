@@ -1,0 +1,7 @@
+{
+  "name": "BrowMap Pro - Espelho Digital de Visagismo",
+  "description": "Um aplicativo profissional para design de sobrancelhas com mapeamento em tempo real, overlays ajustáveis e guias de simetria.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
