@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import CameraView, { CameraViewHandle } from './components/CameraView';
 import EyebrowOverlay from './components/EyebrowOverlay';
@@ -26,7 +25,7 @@ const App: React.FC = () => {
   
   const cameraRef = useRef<CameraViewHandle>(null);
 
-  // Detecta se a permissão já foi concedida anteriormente para pular a tela de introdução
+  // Detect if permission was already granted to skip the welcome screen
   useEffect(() => {
     const checkPermission = async () => {
       try {
@@ -41,7 +40,7 @@ const App: React.FC = () => {
           };
         }
       } catch (e) {
-        console.debug("Permissions API não disponível ou erro na consulta.");
+        console.debug("Permissions API not available.");
       }
     };
     checkPermission();
@@ -50,14 +49,14 @@ const App: React.FC = () => {
   const requestCameraPermission = async () => {
     setIsInitializing(true);
     try {
-      // Solicitação direta de mídia - gatilho essencial para browsers móveis (Gesture required)
+      // Direct media request - essential gesture-triggered activation for mobile browsers
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      // Paramos os tracks apenas para sinalizar permissão; o CameraView re-abrirá com as specs corretas
+      // Stop tracks immediately; CameraView will re-initialize with full configuration
       stream.getTracks().forEach(track => track.stop());
       setHasPermission(true);
       if (navigator.vibrate) navigator.vibrate(50);
     } catch (err: any) {
-      console.error("Permissão negada ou erro:", err);
+      console.error("Camera access denied or error:", err);
       setHasPermission(false);
     } finally {
       setIsInitializing(false);
@@ -95,7 +94,7 @@ const App: React.FC = () => {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `browmap-pro-design-${Date.now()}.png`;
+      link.download = `browmap-snapshot-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
       URL.revokeObjectURL(url);
@@ -110,7 +109,10 @@ const App: React.FC = () => {
   const onStart = (e: React.TouchEvent | React.MouseEvent) => {
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    if (clientX > window.innerWidth - (isSidebarOpen ? 320 : 0)) return;
+    
+    // Evita arrastar se estiver tocando na barra lateral
+    if (isSidebarOpen && clientX > window.innerWidth - 320) return;
+    
     isDragging.current = true;
     lastPos.current = { x: clientX, y: clientY };
   };
@@ -121,25 +123,30 @@ const App: React.FC = () => {
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const dx = clientX - lastPos.current.x;
     const dy = clientY - lastPos.current.y;
+    
     if (config.targetSide === 'both') {
       setConfig(prev => ({ ...prev, posX: prev.posX + dx, posY: prev.posY + dy }));
     } else {
       const sideKey = config.targetSide === 'left' ? 'leftOffset' : 'rightOffset';
-      setConfig(prev => ({ ...prev, [sideKey]: { ...prev[sideKey], x: prev[sideKey].x + dx, y: prev[sideKey].y + dy } }));
+      setConfig(prev => ({ 
+        ...prev, 
+        [sideKey]: { 
+          ...prev[sideKey as keyof BrowConfig] as any, 
+          x: (prev[sideKey as keyof BrowConfig] as any).x + dx, 
+          y: (prev[sideKey as keyof BrowConfig] as any).y + dy 
+        } 
+      }));
     }
     lastPos.current = { x: clientX, y: clientY };
   };
 
-  // Tela de boas-vindas para Android que solicita a permissão da câmera
   if (hasPermission !== true) {
     return (
       <div className="fixed inset-0 bg-black z-[200] flex flex-col items-center justify-center p-8 text-center overflow-hidden">
-        {/* Glow de fundo inspirado no Material 3 */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] bg-amber-500/10 blur-[120px] rounded-full pointer-events-none"></div>
         
         <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
           <div className="mb-10 p-10 bg-zinc-900/40 backdrop-blur-2xl rounded-[3.5rem] border border-white/10 shadow-2xl relative group">
-            <div className="absolute inset-0 bg-amber-500/5 rounded-[3.5rem] opacity-0 group-active:opacity-100 transition-opacity"></div>
             <svg className={`w-16 h-16 text-amber-500 ${isInitializing ? 'animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
               <circle cx="12" cy="13" r="3" />
@@ -150,21 +157,21 @@ const App: React.FC = () => {
             BrowMap <span className="text-amber-500">Pro</span>
           </h1>
           <p className="text-zinc-400 text-sm font-medium mb-12 px-6 leading-relaxed max-w-[320px]">
-            Sua ferramenta profissional de visagismo. Para iniciar a análise facial em tempo real, habilite a câmera.
+            Ferramenta profissional de visagismo. Para iniciar a análise facial em tempo real, habilite o acesso à sua câmera.
           </p>
 
           <button 
             onClick={requestCameraPermission} 
             disabled={isInitializing}
-            className="w-full py-6 bg-amber-500 text-black text-xs font-black uppercase rounded-[2.5rem] shadow-[0_25px_50px_rgba(245,158,11,0.2)] active:scale-95 active:bg-amber-400 transition-all disabled:opacity-50"
+            className="w-full py-6 bg-amber-500 text-black text-xs font-black uppercase rounded-[2.5rem] shadow-[0_25px_50px_rgba(245,158,11,0.2)] active:scale-95 transition-all disabled:opacity-50"
           >
-            {isInitializing ? 'Sincronizando Sensor...' : 'Iniciar Espelhamento'}
+            {isInitializing ? 'Conectando Hardware...' : 'Ativar Espelho Digital'}
           </button>
 
           {hasPermission === false && (
             <div className="mt-8 p-6 bg-red-500/10 border border-red-500/20 rounded-[2rem] animate-in fade-in slide-in-from-bottom-2">
               <p className="text-red-400 text-[10px] font-black uppercase tracking-widest leading-normal">
-                Acesso bloqueado pelo sistema.<br/>Habilite a câmera nas configurações do Android.
+                Acesso bloqueado. Habilite a câmera nas configurações do Android.
               </p>
             </div>
           )}
@@ -192,7 +199,7 @@ const App: React.FC = () => {
           <div className="flex gap-2 mt-2">
             <div className="flex items-center gap-1.5 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-              <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-300">Live Analyzer</span>
+              <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-300">Live View</span>
             </div>
           </div>
         </div>
