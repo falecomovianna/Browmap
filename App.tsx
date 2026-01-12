@@ -24,7 +24,6 @@ const App: React.FC = () => {
   const [draggingHandle, setDraggingHandle] = useState<ActiveHandle | null>(null);
   
   const cameraRef = useRef<CameraViewHandle>(null);
-  const overlayRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -54,7 +53,7 @@ const App: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 1. Desenha o vídeo (com espelhamento se necessário)
+    // 1. Draw Video
     if (config.mirror) {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
@@ -64,8 +63,11 @@ const App: React.FC = () => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
 
-    // 2. Converte SVG para imagem e desenha por cima
-    const svgData = new XMLSerializer().serializeToString(document.querySelector('svg')!);
+    // 2. Draw SVG Overlay
+    const svgElement = document.querySelector('svg');
+    if (!svgElement) return;
+
+    const svgData = new XMLSerializer().serializeToString(svgElement);
     const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
     
@@ -74,7 +76,7 @@ const App: React.FC = () => {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `browmap-snapshot-${Date.now()}.png`;
+      link.download = `browmap-android-pro-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
       URL.revokeObjectURL(url);
@@ -116,9 +118,13 @@ const App: React.FC = () => {
   if (hasPermission === false || hasPermission === null) {
     return (
       <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-12 text-center">
-        <h1 className="text-amber-500 font-black text-2xl italic mb-6">BROW MAP PRO</h1>
-        <button onClick={requestCameraPermission} className="px-8 py-5 bg-amber-500 text-black text-[10px] font-black uppercase rounded-3xl shadow-2xl">
-          Iniciar Câmera
+        <div className="w-24 h-24 mb-8 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/20">
+           <svg className="w-12 h-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+        </div>
+        <h1 className="text-amber-500 font-black text-3xl italic mb-2 tracking-tighter">BROW MAP PRO</h1>
+        <p className="text-zinc-500 text-xs mb-10 font-medium uppercase tracking-[0.2em]">Android Digital Visagism</p>
+        <button onClick={requestCameraPermission} className="w-full max-w-xs py-5 bg-amber-500 text-black text-[11px] font-black uppercase rounded-[2rem] shadow-2xl active:scale-95 transition-transform">
+          Permitir Câmera
         </button>
       </div>
     );
@@ -135,15 +141,22 @@ const App: React.FC = () => {
         <EyebrowOverlay config={config} activeHandle={draggingHandle} />
 
         <div className="absolute top-10 left-10 z-30 pointer-events-none">
-          <span className="text-amber-500 font-black text-base italic tracking-tighter drop-shadow-2xl">BrowMap Pro</span>
+          <span className="text-amber-500 font-black text-xl italic tracking-tighter drop-shadow-2xl">BrowMap Pro</span>
+          <div className="flex gap-2 mt-2">
+            <span className="px-2 py-0.5 bg-black/40 backdrop-blur-md rounded text-[8px] font-bold uppercase tracking-widest border border-white/10">1080p Reality</span>
+            <span className="px-2 py-0.5 bg-amber-500/20 backdrop-blur-md rounded text-[8px] font-bold uppercase tracking-widest border border-amber-500/20 text-amber-500">Live Mirror</span>
+          </div>
         </div>
 
         {(!isSidebarOpen || window.innerWidth <= 1024) && (
           <button 
-            onClick={() => setIsSidebarOpen(true)} 
-            className="absolute top-10 right-10 p-5 bg-amber-500 text-black rounded-3xl shadow-2xl z-30"
+            onClick={() => {
+              setIsSidebarOpen(true);
+              if (navigator.vibrate) navigator.vibrate(5);
+            }} 
+            className="absolute top-10 right-10 w-14 h-14 bg-amber-500 text-black rounded-2xl shadow-2xl z-30 flex items-center justify-center active:scale-90 transition-transform"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 6h16M4 12h16m-7 6h7" /></svg>
           </button>
         )}
       </div>
@@ -154,7 +167,10 @@ const App: React.FC = () => {
           setConfig={setConfig} 
           activeMode={activeMode} 
           setActiveMode={setActiveMode} 
-          resetConfig={() => setConfig(INITIAL_BROW_CONFIG)} 
+          resetConfig={() => {
+            setConfig(INITIAL_BROW_CONFIG);
+            if (navigator.vibrate) navigator.vibrate(15);
+          }} 
           onSave={() => localStorage.setItem(STORAGE_KEY, JSON.stringify(config))}
           onSnapshot={captureSnapshot}
           selectedCamera={selectedCamera} 
