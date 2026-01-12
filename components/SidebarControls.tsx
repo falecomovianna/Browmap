@@ -173,7 +173,7 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
           <div className="space-y-2">
             <Slider label="Comprimento" value={getDisplayValue('width')} min={30} max={350} step={1} onChange={(v: number) => updateValue('width', v)} />
             <Slider label="Arco Superior" value={getDisplayValue('archHeight')} min={0} max={120} step={1} onChange={(v: number) => updateValue('archHeight', v)} />
-            <Slider label="Arco Inferior" value={getDisplayValue('bottomArch')} min={-40} max={80} step={1} onChange={(v: number) => updateValue('bottomArch', v)} />
+            <Slider label="Arco Inferior Ajuste" value={getDisplayValue('bottomArch')} min={-40} max={80} step={1} onChange={(v: number) => updateValue('bottomArch', v)} />
             <Slider label="Espessura Inicial" value={getDisplayValue('thickness')} min={1} max={50} step={0.5} onChange={(v: number) => updateValue('thickness', v)} />
             <Slider label="Curvatura Superior" value={getDisplayValue('curvature')} min={0} max={3.0} step={0.05} precision={2} onChange={(v: number) => updateValue('curvature', v)} />
           </div>

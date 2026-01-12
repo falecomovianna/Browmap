@@ -23,7 +23,6 @@ const App: React.FC = () => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [draggingHandle, setDraggingHandle] = useState<ActiveHandle | null>(null);
   
-  // Ajusta visibilidade da sidebar ao redimensionar
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth > 1024) {
@@ -40,7 +39,7 @@ const App: React.FC = () => {
       stream.getTracks().forEach(track => track.stop());
       setHasPermission(true);
     } catch (err: any) {
-      console.error("Permissão de câmera falhou:", err);
+      console.error("Permissão negada:", err);
       setHasPermission(false);
     }
   };
@@ -69,7 +68,6 @@ const App: React.FC = () => {
 
   const findHitHandle = (clientX: number, clientY: number): ActiveHandle | null => {
     if (!config.showGuides) return null;
-    
     const svgCenterX = (window.innerWidth + (window.innerWidth > 1024 && isSidebarOpen ? -320 : 0)) / 2 + config.posX;
     const svgCenterY = window.innerHeight / 2 + config.posY;
     const sides: ('left' | 'right')[] = ['left', 'right'];
@@ -129,7 +127,6 @@ const App: React.FC = () => {
       const { side, type } = draggingHandle;
       const sideKey = side === 'left' ? 'leftOffset' : 'rightOffset';
       const dir = side === 'left' ? -1 : 1;
-
       setConfig(prev => {
         const newSide = { ...prev[sideKey] };
         if (type === 'pos') { newSide.x += dx; newSide.y += dy; }
@@ -145,10 +142,7 @@ const App: React.FC = () => {
         setConfig(prev => ({ ...prev, posX: prev.posX + dx, posY: prev.posY + dy }));
       } else {
         const sideKey = config.targetSide === 'left' ? 'leftOffset' : 'rightOffset';
-        setConfig(prev => ({
-          ...prev,
-          [sideKey]: { ...prev[sideKey], x: prev[sideKey].x + dx, y: prev[sideKey].y + dy }
-        }));
+        setConfig(prev => ({ ...prev, [sideKey]: { ...prev[sideKey], x: prev[sideKey].x + dx, y: prev[sideKey].y + dy } }));
       }
       lastPos.current = { x, y };
     } else if ('touches' in e && e.touches.length === 2 && initialDist.current !== null) {
@@ -158,7 +152,6 @@ const App: React.FC = () => {
       const currentAngle = Math.atan2(e.touches[1].clientY - e.touches[0].clientY, e.touches[1].clientX - e.touches[0].clientX) * 180 / Math.PI;
       const angleDiff = currentAngle - (initialAngle.current || 0);
       const newRotation = initialRotation.current + angleDiff;
-
       if (config.targetSide === 'both') {
         setConfig(prev => ({ ...prev, scale: newScale, rotation: newRotation }));
       } else {
@@ -177,11 +170,11 @@ const App: React.FC = () => {
           </svg>
         </div>
         <h1 className="text-amber-500 font-black text-2xl italic tracking-tighter mb-4">BROW MAP PRO</h1>
-        <p className="text-zinc-400 text-sm uppercase tracking-widest font-bold mb-10 max-w-xs leading-relaxed">
-          {hasPermission === false ? "Permissão negada. Ative a câmera no seu navegador ou configurações do Android." : "Acesse sua câmera para iniciar o visagismo digital."}
+        <p className="text-zinc-400 text-xs uppercase tracking-[0.2em] font-bold mb-10 max-w-xs leading-relaxed">
+          {hasPermission === false ? "Permissão negada. Ative a câmera no seu navegador ou configurações." : "Iniciando visão profissional..."}
         </p>
         <button onClick={requestCameraPermission} className="w-full max-w-xs py-5 bg-amber-500 text-black text-xs font-black uppercase rounded-2xl shadow-xl active:scale-95 transition-all">
-          {hasPermission === false ? "Tentar Novamente" : "Permitir Câmera"}
+          Permitir Acesso
         </button>
       </div>
     );
@@ -190,7 +183,7 @@ const App: React.FC = () => {
   return (
     <div className="relative w-full h-full flex overflow-hidden bg-black font-sans text-zinc-100 select-none">
       <div 
-        className={`relative flex-1 transition-all duration-500 bg-zinc-950 cursor-move h-full overflow-hidden ${isSidebarOpen && window.innerWidth > 1024 ? 'mr-[320px]' : ''}`}
+        className={`relative flex-1 transition-all duration-500 bg-transparent cursor-move h-full overflow-hidden ${isSidebarOpen && window.innerWidth > 1024 ? 'mr-[320px]' : ''}`}
         onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={() => { isDragging.current = false; setDraggingHandle(null); initialDist.current = null; }}
         onMouseDown={onStart} onMouseMove={onMove} onMouseUp={() => { isDragging.current = false; setDraggingHandle(null); }}
       >
@@ -199,8 +192,8 @@ const App: React.FC = () => {
 
         <div className="absolute top-8 left-8 z-30 pointer-events-none">
           <div className="flex flex-col">
-            <span className="text-amber-500 font-black text-sm italic tracking-tighter drop-shadow-md">BrowMap Pro</span>
-            <span className="text-[7px] text-white font-bold uppercase tracking-[0.3em] opacity-80">Full View Edition</span>
+            <span className="text-amber-500 font-black text-sm italic tracking-tighter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">BrowMap Pro</span>
+            <span className="text-[7px] text-white font-bold uppercase tracking-[0.3em] opacity-80">Full Lens Edition</span>
           </div>
         </div>
 
@@ -231,7 +224,6 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-transparent z-40" onClick={() => setIsSidebarOpen(false)} />
       )}
       
-      {/* SIDEBAR TOTALMENTE TRANSPARENTE */}
       <div className={`
         fixed right-0 top-0 bottom-0 z-50 transition-all duration-500 ease-out h-full 
         bg-transparent border-l border-white/5

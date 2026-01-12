@@ -98,7 +98,7 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config, activeHandle })
                 stroke={color} 
                 strokeWidth={targetSide === side ? "2.5" : "1.2"}
                 fill={color}
-                fillOpacity="0.08"
+                fillOpacity="0.05"
               />
             </g>
           ))}

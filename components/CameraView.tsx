@@ -6,103 +6,107 @@ interface CameraViewProps {
   mirror: boolean;
 }
 
-/**
- * CameraView Component
- * Gerencia o ciclo de vida do fluxo de vídeo, permissões e tratamento de erros
- * específico para Web e WebViews Android.
- */
 const CameraView: React.FC<CameraViewProps> = ({ deviceId, mirror }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [errorType, setErrorType] = useState<'permission' | 'https' | 'hardware' | 'browser' | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
-  const isStartingRef = useRef(false);
+  const isInitializing = useRef(false);
 
-  // Limpa os tracks da câmera para liberar o hardware
   const stopTracks = () => {
     if (activeStreamRef.current) {
-      activeStreamRef.current.getTracks().forEach(track => track.stop());
+      console.log("[DEBUG] Encerrando tracks ativos para liberar hardware...");
+      activeStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log(`[DEBUG] Track ${track.label} parado.`);
+      });
       activeStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   };
 
-  const startCamera = async () => {
-    if (isStartingRef.current) return;
-    isStartingRef.current = true;
-    setErrorType(null);
-    setErrorMsg(null);
+  const startCamera = async (retryWithAny = false) => {
+    if (isInitializing.current && !retryWithAny) return;
+    isInitializing.current = true;
+    
+    setError(null);
+    console.log(`[DEBUG] Iniciando captura (Modo Fallback: ${retryWithAny})...`);
 
-    // 1. Verificação de Contexto Seguro (Obrigatório para getUserMedia na Web)
-    // A câmera só funciona em HTTPS ou localhost.
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (!window.isSecureContext && !isLocalhost) {
-      setErrorType('https');
-      setErrorMsg("ACESSO BLOQUEADO: A câmera requer uma conexão segura (HTTPS). Se estiver usando WebView no Android, certifique-se de que a URL de origem é segura ou use um servidor local para testes.");
-      isStartingRef.current = false;
-      return;
-    }
-
-    // 2. Verificação de suporte do Navegador/WebView
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setErrorType('browser');
-      setErrorMsg("Navegador Incompatível: O ambiente atual não suporta a API de mídia (WebRTC). Se estiver no Android, verifique se o WebView está atualizado e se o JavaScript está habilitado.");
-      isStartingRef.current = false;
+    // Validação de Contexto Seguro
+    if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+      setError("A câmera exige HTTPS.");
+      isInitializing.current = false;
       return;
     }
 
     try {
+      // 1. Limpeza total antes de tentar abrir
       stopTracks();
+      
+      // 2. Pequeno delay para o OS liberar o hardware (Essencial para Mobile)
+      await new Promise(resolve => setTimeout(resolve, 150));
 
-      // Configurações de constraints balanceadas para performance e qualidade
+      // 3. Configuração de Constraints
+      // Usamos 'ideal' em vez de 'exact' para evitar o erro 'Could not start video source'
+      let videoConstraints: MediaTrackConstraints = {};
+      
+      if (retryWithAny) {
+        videoConstraints = { facingMode: "user" };
+      } else if (deviceId) {
+        videoConstraints = { deviceId: { ideal: deviceId } };
+      } else {
+        videoConstraints = { facingMode: "user" };
+      }
+
       const constraints: MediaStreamConstraints = {
-        video: deviceId 
-          ? { deviceId: { exact: deviceId } } 
-          : { 
-              facingMode: 'user', 
-              width: { ideal: 1280 }, 
-              height: { ideal: 720 },
-              frameRate: { ideal: 30 }
-            },
-        audio: false // Desabilitado para evitar pedidos de permissão de microfone desnecessários
+        video: videoConstraints,
+        audio: false
       };
 
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (e) {
-        console.warn("Tentativa com constraints ideais falhou, tentando modo básico...", e);
-        // Fallback para qualquer hardware de vídeo disponível (útil em dispositivos Android com hardware customizado)
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      }
+      console.log("[DEBUG] Solicitando getUserMedia com:", JSON.stringify(constraints));
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log("[DEBUG] Stream obtido com sucesso:", stream.id);
+      
+      activeStreamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        activeStreamRef.current = stream;
         
-        // No Android WebView, play() pode precisar de interação se as permissões de mídia não forem configuradas
-        try {
-          await videoRef.current.play();
-        } catch (playErr) {
-          console.error("Erro no play automático:", playErr);
-          // Tenta novamente sem silenciar se necessário, embora muted já esteja setado no JSX
-        }
+        // Garantia de Playback no Safari/Chrome Mobile
+        videoRef.current.onloadedmetadata = async () => {
+          try {
+            console.log("[DEBUG] Metadados prontos. Tentando play...");
+            await videoRef.current?.play();
+            console.log("[DEBUG] Playback ativo. ReadyState:", videoRef.current?.readyState);
+          } catch (e) {
+            console.error("[DEBUG] Erro no play():", e);
+          }
+        };
       }
     } catch (err: any) {
-      console.error("Erro ao acessar câmera:", err);
+      console.error("[DEBUG] Falha ao iniciar câmera:", err.name, err.message);
       
-      // Diferenciação de erros para facilitar o diagnóstico do desenvolvedor
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setErrorType('permission');
-        setErrorMsg("PERMISSÃO NEGADA: O usuário ou o sistema bloqueou o acesso. No Android Studio, verifique se implementou o 'WebChromeClient.onPermissionRequest'.");
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setErrorType('hardware');
-        setErrorMsg("Hardware não encontrado: Nenhuma câmera detectada no dispositivo.");
-      } else {
-        setErrorType('hardware');
-        setErrorMsg(`Erro de Sistema: ${err.message || "Não foi possível inicializar a câmera."}`);
+      // Se falhou com uma câmera específica, tenta qualquer uma
+      if (!retryWithAny) {
+        console.warn("[DEBUG] Tentando fallback para qualquer câmera disponível...");
+        startCamera(true);
+        return;
       }
+
+      let userMsg = "Erro ao carregar câmera.";
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        userMsg = "Permissão negada pelo usuário.";
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        userMsg = "A câmera está sendo usada por outro app ou aba.";
+      } else if (err.name === 'OverconstrainedError') {
+        userMsg = "As configurações da câmera não são suportadas.";
+      }
+      
+      setError(userMsg);
     } finally {
-      isStartingRef.current = false;
+      isInitializing.current = false;
     }
   };
 
@@ -111,53 +115,43 @@ const CameraView: React.FC<CameraViewProps> = ({ deviceId, mirror }) => {
     return () => stopTracks();
   }, [deviceId]);
 
-  // UI de Feedback de Erro
-  if (errorType) {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 text-white p-8 text-center z-20">
-        <div className="max-w-xs space-y-6">
-          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
+  return (
+    <div className="fixed inset-0 bg-black overflow-hidden flex items-center justify-center">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className={`w-full h-full object-cover transition-transform duration-700 ${mirror ? 'scale-x-[-1]' : 'scale-x-1'}`}
+        style={{ 
+          display: error ? 'none' : 'block',
+          zIndex: 0,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh'
+        }}
+      />
+
+      {error && (
+        <div className="relative z-50 p-8 bg-black/90 backdrop-blur-xl rounded-[40px] border border-red-500/20 text-center max-w-xs mx-auto shadow-2xl">
+          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <div>
-            <h2 className="text-lg font-black uppercase tracking-tighter text-amber-500 mb-2">
-              {errorType === 'https' ? 'Erro de Segurança' : errorType === 'permission' ? 'Erro de Permissão' : 'Erro de Acesso'}
-            </h2>
-            <p className="text-[11px] text-zinc-400 leading-relaxed font-medium uppercase tracking-wider">{errorMsg}</p>
-          </div>
+          <h2 className="text-white font-black text-sm uppercase tracking-[0.2em] mb-3">Erro de Hardware</h2>
+          <p className="text-zinc-400 text-xs mb-8 leading-relaxed font-medium">{error}</p>
           <button 
             onClick={() => startCamera()}
-            className="w-full py-4 bg-amber-500 text-black text-[10px] font-black uppercase rounded-2xl shadow-xl active:scale-95 transition-all"
+            className="w-full py-5 bg-white text-black text-[10px] font-black uppercase rounded-2xl active:scale-95 transition-all shadow-xl"
           >
-            Tentar Novamente
+            Tentar Reconectar
           </button>
-
-          {/* Dicas específicas para o desenvolvedor Android */}
-          {(errorType === 'permission' || errorType === 'browser') && (
-            <div className="p-4 bg-zinc-900 rounded-xl border border-white/5 text-left overflow-hidden">
-              <p className="text-[8px] text-zinc-500 font-bold uppercase mb-2">Checklist Android Studio:</p>
-              <ul className="text-[8px] text-zinc-400 space-y-1 list-disc pl-3">
-                <li>AndroidManifest.xml com CAMERA e hardware.camera</li>
-                <li>Habilitar JavaScript: webView.settings.javaScriptEnabled = true</li>
-                <li>Implementar WebChromeClient.onPermissionRequest</li>
-              </ul>
-            </div>
-          )}
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted
-      className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 ${mirror ? 'scale-x-[-1]' : 'scale-x-[1]'}`}
-    />
+      )}
+    </div>
   );
 };
 
