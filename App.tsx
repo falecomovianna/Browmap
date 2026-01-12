@@ -6,7 +6,7 @@ import SidebarControls from './components/SidebarControls';
 import { INITIAL_BROW_CONFIG } from './constants';
 import { BrowConfig, ControlMode, ActiveHandle } from './types';
 
-const STORAGE_KEY = 'brow_map_pro_v2_config';
+const STORAGE_KEY = 'brow_map_pro_v3_config';
 
 const App: React.FC = () => {
   const [config, setConfig] = useState<BrowConfig>(() => {
@@ -19,35 +19,36 @@ const App: React.FC = () => {
 
   const [activeMode, setActiveMode] = useState<ControlMode>('visagism');
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [draggingHandle, setDraggingHandle] = useState<ActiveHandle | null>(null);
   
-  /**
-   * Solicita permissão de câmera explicitamente.
-   * Em WebViews Android, este gatilho ativa o onPermissionRequest do código nativo.
-   */
+  // Ajusta visibilidade da sidebar ao redimensionar
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 1024) {
+        setIsSidebarOpen(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const requestCameraPermission = async () => {
     try {
-      // Pequeno timeout para garantir que o contexto do navegador esteja pronto
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach(track => track.stop());
       setHasPermission(true);
     } catch (err: any) {
-      console.error("Permissão de câmera falhou no App.tsx:", err);
-      // Se for um erro de segurança/HTTPS, o CameraView lidará com a UI detalhada
+      console.error("Permissão de câmera falhou:", err);
       setHasPermission(false);
     }
   };
 
-  // Tenta detectar permissão automaticamente no load para melhorar UX
   useEffect(() => {
     if (navigator.permissions && (navigator.permissions as any).query) {
       (navigator.permissions as any).query({ name: 'camera' }).then((status: any) => {
         if (status.state === 'granted') setHasPermission(true);
-        status.onchange = () => {
-          if (status.state === 'granted') setHasPermission(true);
-        };
       }).catch(() => {});
     }
   }, []);
@@ -59,10 +60,17 @@ const App: React.FC = () => {
   const initialAngle = useRef<number | null>(null);
   const initialRotation = useRef<number>(0);
 
+  const getEventPos = (e: React.TouchEvent | React.MouseEvent | TouchEvent | MouseEvent) => {
+    if ('touches' in e) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY, count: e.touches.length };
+    }
+    return { x: e.clientX, y: e.clientY, count: 1 };
+  };
+
   const findHitHandle = (clientX: number, clientY: number): ActiveHandle | null => {
     if (!config.showGuides) return null;
     
-    const svgCenterX = window.innerWidth / 2 + config.posX;
+    const svgCenterX = (window.innerWidth + (window.innerWidth > 1024 && isSidebarOpen ? -320 : 0)) / 2 + config.posX;
     const svgCenterY = window.innerHeight / 2 + config.posY;
     const sides: ('left' | 'right')[] = ['left', 'right'];
     const threshold = 45; 
@@ -88,20 +96,21 @@ const App: React.FC = () => {
     return null;
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (isSidebarOpen && e.touches[0].clientX > window.innerWidth - 320) return;
+  const onStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const { x, y, count } = getEventPos(e);
+    if (x > window.innerWidth - (isSidebarOpen ? 320 : 0)) return;
 
-    const hit = findHitHandle(e.touches[0].clientX, e.touches[0].clientY);
+    const hit = findHitHandle(x, y);
     if (hit) {
       setDraggingHandle(hit);
-      lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      lastPos.current = { x, y };
       return;
     }
 
-    if (e.touches.length === 1) {
+    if (count === 1) {
       isDragging.current = true;
-      lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    } else if (e.touches.length === 2) {
+      lastPos.current = { x, y };
+    } else if ('touches' in e && e.touches.length === 2) {
       isDragging.current = false;
       const d = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
       initialDist.current = d;
@@ -111,9 +120,10 @@ const App: React.FC = () => {
     }
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const dx = e.touches[0].clientX - lastPos.current.x;
-    const dy = e.touches[0].clientY - lastPos.current.y;
+  const onMove = (e: React.TouchEvent | React.MouseEvent) => {
+    const { x, y, count } = getEventPos(e);
+    const dx = x - lastPos.current.x;
+    const dy = y - lastPos.current.y;
 
     if (draggingHandle) {
       const { side, type } = draggingHandle;
@@ -121,29 +131,16 @@ const App: React.FC = () => {
       const dir = side === 'left' ? -1 : 1;
 
       setConfig(prev => {
-        const currentSide = prev[sideKey];
-        const newSide = { ...currentSide };
-
-        if (type === 'pos') {
-          newSide.x += dx;
-          newSide.y += dy;
-        } else if (type === 'width') {
-          newSide.width = Math.max(40, newSide.width + dx * dir);
-        } else if (type === 'arch') {
-          newSide.archHeight = Math.max(0, newSide.archHeight - dy);
-        } else if (type === 'bottomArch') {
-          newSide.bottomArch = Math.max(-30, newSide.bottomArch + dy);
-        } else if (type === 'thickness') {
-          newSide.thickness = Math.max(2, newSide.thickness + dy);
-        }
-
+        const newSide = { ...prev[sideKey] };
+        if (type === 'pos') { newSide.x += dx; newSide.y += dy; }
+        else if (type === 'width') { newSide.width = Math.max(40, newSide.width + dx * dir); }
+        else if (type === 'arch') { newSide.archHeight = Math.max(0, newSide.archHeight - dy); }
+        else if (type === 'bottomArch') { newSide.bottomArch = Math.max(-30, newSide.bottomArch + dy); }
+        else if (type === 'thickness') { newSide.thickness = Math.max(2, newSide.thickness + dy); }
         return { ...prev, [sideKey]: newSide };
       });
-      lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      return;
-    }
-
-    if (e.touches.length === 1 && isDragging.current) {
+      lastPos.current = { x, y };
+    } else if (count === 1 && isDragging.current) {
       if (config.targetSide === 'both') {
         setConfig(prev => ({ ...prev, posX: prev.posX + dx, posY: prev.posY + dy }));
       } else {
@@ -153,12 +150,11 @@ const App: React.FC = () => {
           [sideKey]: { ...prev[sideKey], x: prev[sideKey].x + dx, y: prev[sideKey].y + dy }
         }));
       }
-      lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    } else if (e.touches.length === 2 && initialDist.current !== null) {
+      lastPos.current = { x, y };
+    } else if ('touches' in e && e.touches.length === 2 && initialDist.current !== null) {
       const currentDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
       const scaleFactor = currentDist / initialDist.current;
       const newScale = Math.min(Math.max(initialScale.current * scaleFactor, 0.2), 5.0);
-
       const currentAngle = Math.atan2(e.touches[1].clientY - e.touches[0].clientY, e.touches[1].clientX - e.touches[0].clientX) * 180 / Math.PI;
       const angleDiff = currentAngle - (initialAngle.current || 0);
       const newRotation = initialRotation.current + angleDiff;
@@ -167,21 +163,11 @@ const App: React.FC = () => {
         setConfig(prev => ({ ...prev, scale: newScale, rotation: newRotation }));
       } else {
         const sideKey = config.targetSide === 'left' ? 'leftOffset' : 'rightOffset';
-        setConfig(prev => ({
-          ...prev,
-          [sideKey]: { ...prev[sideKey], scale: newScale, rotation: newRotation }
-        }));
+        setConfig(prev => ({ ...prev, [sideKey]: { ...prev[sideKey], scale: newScale, rotation: newRotation } }));
       }
     }
   };
 
-  const handleTouchEnd = () => {
-    isDragging.current = false;
-    setDraggingHandle(null);
-    initialDist.current = null;
-  };
-
-  // Se a permissão for explicitamente negada ou ainda não solicitada, mostra tela de onboarding/permissão
   if (hasPermission === false || hasPermission === null) {
     return (
       <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-8 text-center">
@@ -192,38 +178,33 @@ const App: React.FC = () => {
         </div>
         <h1 className="text-amber-500 font-black text-2xl italic tracking-tighter mb-4">BROW MAP PRO</h1>
         <p className="text-zinc-400 text-sm uppercase tracking-widest font-bold mb-10 max-w-xs leading-relaxed">
-          {hasPermission === false ? "O acesso foi negado. Verifique as configurações de permissão do sistema ou do WebView." : "Acesse sua câmera para iniciar o visagismo digital."}
+          {hasPermission === false ? "Permissão negada. Ative a câmera no seu navegador ou configurações do Android." : "Acesse sua câmera para iniciar o visagismo digital."}
         </p>
-        <button 
-          onClick={requestCameraPermission} 
-          className="w-full max-w-xs py-5 bg-amber-500 text-black text-xs font-black uppercase rounded-2xl shadow-xl active:scale-95 transition-all"
-        >
+        <button onClick={requestCameraPermission} className="w-full max-w-xs py-5 bg-amber-500 text-black text-xs font-black uppercase rounded-2xl shadow-xl active:scale-95 transition-all">
           {hasPermission === false ? "Tentar Novamente" : "Permitir Câmera"}
         </button>
-        {hasPermission === false && (
-          <p className="mt-6 text-[9px] text-zinc-500 uppercase font-bold tracking-widest">Dica: No Android, habilite a permissão de câmera nas configurações do App.</p>
-        )}
       </div>
     );
   }
 
   return (
     <div className="relative w-full h-full flex overflow-hidden bg-black font-sans text-zinc-100 select-none">
-      <div className="absolute inset-0 bg-zinc-950 cursor-move h-full overflow-hidden" 
-        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-        {/* O CameraView agora possui lógica de proteção HTTPS e fallback de hardware interna */}
+      <div 
+        className={`relative flex-1 transition-all duration-500 bg-zinc-950 cursor-move h-full overflow-hidden ${isSidebarOpen && window.innerWidth > 1024 ? 'mr-[320px]' : ''}`}
+        onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={() => { isDragging.current = false; setDraggingHandle(null); initialDist.current = null; }}
+        onMouseDown={onStart} onMouseMove={onMove} onMouseUp={() => { isDragging.current = false; setDraggingHandle(null); }}
+      >
         <CameraView deviceId={selectedCamera} mirror={config.mirror} />
-        
         <EyebrowOverlay config={config} activeHandle={draggingHandle} />
 
         <div className="absolute top-8 left-8 z-30 pointer-events-none">
           <div className="flex flex-col">
             <span className="text-amber-500 font-black text-sm italic tracking-tighter drop-shadow-md">BrowMap Pro</span>
-            <span className="text-[7px] text-white font-bold uppercase tracking-[0.3em] opacity-80">Mapping Geometry</span>
+            <span className="text-[7px] text-white font-bold uppercase tracking-[0.3em] opacity-80">Full View Edition</span>
           </div>
         </div>
 
-        {!isSidebarOpen && (
+        {(!isSidebarOpen || window.innerWidth <= 1024) && (
           <div className="absolute left-8 bottom-10 flex flex-col gap-3 z-30">
             {['left', 'both', 'right'].map(s => (
               <button key={s} onClick={() => setConfig(p => ({ ...p, targetSide: s as any }))}
@@ -234,15 +215,28 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {!isSidebarOpen && (
-          <button onClick={() => setIsSidebarOpen(true)} className="absolute top-8 right-8 p-5 bg-amber-500 text-black rounded-3xl shadow-xl active:scale-90 z-30 transition-transform">
-            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+        {(!isSidebarOpen || window.innerWidth <= 1024) && (
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            className="absolute top-8 right-8 p-5 bg-amber-500 text-black rounded-3xl shadow-xl active:scale-90 z-30 transition-transform"
+          >
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d={isSidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16m-7 6h7"} />
+            </svg>
           </button>
         )}
       </div>
 
-      {isSidebarOpen && <div className="fixed inset-0 bg-transparent z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />}
-      <div className={`fixed right-0 top-0 bottom-0 z-50 transition-all duration-500 ease-out h-full ${isSidebarOpen ? 'w-[320px] translate-x-0' : 'w-0 translate-x-full'} overflow-hidden bg-transparent`}>
+      {isSidebarOpen && window.innerWidth <= 1024 && (
+        <div className="fixed inset-0 bg-transparent z-40" onClick={() => setIsSidebarOpen(false)} />
+      )}
+      
+      {/* SIDEBAR TOTALMENTE TRANSPARENTE */}
+      <div className={`
+        fixed right-0 top-0 bottom-0 z-50 transition-all duration-500 ease-out h-full 
+        bg-transparent border-l border-white/5
+        ${isSidebarOpen ? 'w-[320px] translate-x-0' : 'w-0 translate-x-full'}
+      `}>
         <SidebarControls 
           config={config} 
           setConfig={setConfig} 

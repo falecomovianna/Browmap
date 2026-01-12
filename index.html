@@ -7,6 +7,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
+    <link rel="manifest" href="metadata.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3163/3163214.png">
     <title>BrowMap Pro - Visagismo Digital</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -20,14 +22,12 @@
             touch-action: none;
             -webkit-user-select: none;
             user-select: none;
-            /* Garante que o conteúdo use toda a tela em celulares com notch */
             padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         }
         #root {
             height: 100%;
             display: flex;
         }
-        /* Oculta barras de rolagem */
         .scrollbar-hide::-webkit-scrollbar {
             display: none;
         }
@@ -36,14 +36,19 @@
             scrollbar-width: none;
         }
         
-        /* Animação para o prompt de rotação */
-        @keyframes rotate-phone {
-            0% { transform: rotate(0deg); }
-            50% { transform: rotate(90deg); }
-            100% { transform: rotate(0deg); }
+        /* Estilização Scrollbar customizada para Desktop Web */
+        ::-webkit-scrollbar {
+            width: 4px;
         }
-        .animate-rotate {
-            animation: rotate-phone 2s ease-in-out infinite;
+        ::-webkit-scrollbar-track {
+            background: #000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #f59e0b;
         }
     </style>
 <script type="importmap">
