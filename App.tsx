@@ -21,9 +21,28 @@ const App: React.FC = () => {
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [draggingHandle, setDraggingHandle] = useState<ActiveHandle | null>(null);
   
   const cameraRef = useRef<CameraViewHandle>(null);
+
+  // Tentar detectar permissão existente ao montar
+  useEffect(() => {
+    const checkPermission = async () => {
+      try {
+        const result = await navigator.permissions.query({ name: 'camera' as any });
+        if (result.state === 'granted') {
+          setHasPermission(true);
+        } else if (result.state === 'denied') {
+          setHasPermission(false);
+        }
+        // Se 'prompt', mantemos null para mostrar a tela de boas-vindas
+      } catch (e) {
+        console.debug("Permissions API não suportada, usando fluxo padrão.");
+      }
+    };
+    checkPermission();
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -34,12 +53,16 @@ const App: React.FC = () => {
   }, []);
 
   const requestCameraPermission = async () => {
+    setIsInitializing(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach(track => track.stop());
       setHasPermission(true);
+      if (navigator.vibrate) navigator.vibrate(50);
     } catch (err: any) {
       setHasPermission(false);
+    } finally {
+      setIsInitializing(false);
     }
   };
 
@@ -53,7 +76,6 @@ const App: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 1. Draw Video
     if (config.mirror) {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
@@ -63,7 +85,6 @@ const App: React.FC = () => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
 
-    // 2. Draw SVG Overlay
     const svgElement = document.querySelector('svg');
     if (!svgElement) return;
 
@@ -76,7 +97,7 @@ const App: React.FC = () => {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `browmap-android-pro-${Date.now()}.png`;
+      link.download = `browmap-pro-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
       URL.revokeObjectURL(url);
@@ -91,9 +112,7 @@ const App: React.FC = () => {
   const onStart = (e: React.TouchEvent | React.MouseEvent) => {
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    
     if (clientX > window.innerWidth - (isSidebarOpen ? 320 : 0)) return;
-
     isDragging.current = true;
     lastPos.current = { x: clientX, y: clientY };
   };
@@ -102,10 +121,8 @@ const App: React.FC = () => {
     if (!isDragging.current) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    
     const dx = clientX - lastPos.current.x;
     const dy = clientY - lastPos.current.y;
-
     if (config.targetSide === 'both') {
       setConfig(prev => ({ ...prev, posX: prev.posX + dx, posY: prev.posY + dy }));
     } else {
@@ -115,17 +132,39 @@ const App: React.FC = () => {
     lastPos.current = { x: clientX, y: clientY };
   };
 
-  if (hasPermission === false || hasPermission === null) {
+  if (hasPermission !== true) {
     return (
-      <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-12 text-center">
-        <div className="w-24 h-24 mb-8 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/20">
-           <svg className="w-12 h-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+      <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-10 text-center">
+        <div className="relative mb-10">
+          <div className="absolute inset-0 bg-amber-500/20 blur-3xl rounded-full"></div>
+          <div className="relative w-32 h-32 bg-zinc-900 rounded-[2.5rem] flex items-center justify-center border border-white/10 shadow-2xl">
+            <svg className={`w-14 h-14 text-amber-500 ${isInitializing ? 'animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <circle cx="12" cy="13" r="3" />
+            </svg>
+          </div>
         </div>
-        <h1 className="text-amber-500 font-black text-3xl italic mb-2 tracking-tighter">BROW MAP PRO</h1>
-        <p className="text-zinc-500 text-xs mb-10 font-medium uppercase tracking-[0.2em]">Android Digital Visagism</p>
-        <button onClick={requestCameraPermission} className="w-full max-w-xs py-5 bg-amber-500 text-black text-[11px] font-black uppercase rounded-[2rem] shadow-2xl active:scale-95 transition-transform">
-          Permitir Câmera
+        
+        <h1 className="text-white font-black text-4xl italic tracking-tighter mb-4">BROW MAP <span className="text-amber-500">PRO</span></h1>
+        <p className="text-zinc-500 text-sm max-w-[280px] mb-12 leading-relaxed">
+          Para iniciar o mapeamento facial em tempo real, precisamos acessar sua câmera frontal.
+        </p>
+
+        {hasPermission === false && (
+          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-bold">
+            Acesso à câmera bloqueado. Verifique as configurações do navegador.
+          </div>
+        )}
+
+        <button 
+          onClick={requestCameraPermission} 
+          disabled={isInitializing}
+          className="w-full max-w-xs py-6 bg-amber-500 text-black text-xs font-black uppercase rounded-[2rem] shadow-[0_20px_40px_rgba(245,158,11,0.2)] active:scale-95 transition-all disabled:opacity-50"
+        >
+          {isInitializing ? 'Aguardando Hardware...' : 'Ativar Espelho Digital'}
         </button>
+        
+        <p className="mt-8 text-[10px] text-zinc-600 font-bold uppercase tracking-[0.3em]">Design e Visagismo de Precisão</p>
       </div>
     );
   }
@@ -143,8 +182,10 @@ const App: React.FC = () => {
         <div className="absolute top-10 left-10 z-30 pointer-events-none">
           <span className="text-amber-500 font-black text-xl italic tracking-tighter drop-shadow-2xl">BrowMap Pro</span>
           <div className="flex gap-2 mt-2">
-            <span className="px-2 py-0.5 bg-black/40 backdrop-blur-md rounded text-[8px] font-bold uppercase tracking-widest border border-white/10">1080p Reality</span>
-            <span className="px-2 py-0.5 bg-amber-500/20 backdrop-blur-md rounded text-[8px] font-bold uppercase tracking-widest border border-amber-500/20 text-amber-500">Live Mirror</span>
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-[8px] font-bold uppercase tracking-widest">Sensor Ativo</span>
+            </div>
           </div>
         </div>
 
