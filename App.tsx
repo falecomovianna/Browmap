@@ -23,15 +23,34 @@ const App: React.FC = () => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [draggingHandle, setDraggingHandle] = useState<ActiveHandle | null>(null);
   
+  /**
+   * Solicita permissão de câmera explicitamente.
+   * Em WebViews Android, este gatilho ativa o onPermissionRequest do código nativo.
+   */
   const requestCameraPermission = async () => {
     try {
+      // Pequeno timeout para garantir que o contexto do navegador esteja pronto
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach(track => track.stop());
       setHasPermission(true);
-    } catch (err) {
+    } catch (err: any) {
+      console.error("Permissão de câmera falhou no App.tsx:", err);
+      // Se for um erro de segurança/HTTPS, o CameraView lidará com a UI detalhada
       setHasPermission(false);
     }
   };
+
+  // Tenta detectar permissão automaticamente no load para melhorar UX
+  useEffect(() => {
+    if (navigator.permissions && (navigator.permissions as any).query) {
+      (navigator.permissions as any).query({ name: 'camera' }).then((status: any) => {
+        if (status.state === 'granted') setHasPermission(true);
+        status.onchange = () => {
+          if (status.state === 'granted') setHasPermission(true);
+        };
+      }).catch(() => {});
+    }
+  }, []);
 
   const isDragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
@@ -162,7 +181,8 @@ const App: React.FC = () => {
     initialDist.current = null;
   };
 
-  if (hasPermission !== true) {
+  // Se a permissão for explicitamente negada ou ainda não solicitada, mostra tela de onboarding/permissão
+  if (hasPermission === false || hasPermission === null) {
     return (
       <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-8 text-center">
         <div className="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center mb-8 border border-amber-500/20">
@@ -171,8 +191,18 @@ const App: React.FC = () => {
           </svg>
         </div>
         <h1 className="text-amber-500 font-black text-2xl italic tracking-tighter mb-4">BROW MAP PRO</h1>
-        <p className="text-zinc-400 text-sm uppercase tracking-widest font-bold mb-10 max-w-xs leading-relaxed">Acesse sua câmera para iniciar.</p>
-        <button onClick={requestCameraPermission} className="w-full max-w-xs py-5 bg-amber-500 text-black text-xs font-black uppercase rounded-2xl shadow-xl">Permitir Câmera</button>
+        <p className="text-zinc-400 text-sm uppercase tracking-widest font-bold mb-10 max-w-xs leading-relaxed">
+          {hasPermission === false ? "O acesso foi negado. Verifique as configurações de permissão do sistema ou do WebView." : "Acesse sua câmera para iniciar o visagismo digital."}
+        </p>
+        <button 
+          onClick={requestCameraPermission} 
+          className="w-full max-w-xs py-5 bg-amber-500 text-black text-xs font-black uppercase rounded-2xl shadow-xl active:scale-95 transition-all"
+        >
+          {hasPermission === false ? "Tentar Novamente" : "Permitir Câmera"}
+        </button>
+        {hasPermission === false && (
+          <p className="mt-6 text-[9px] text-zinc-500 uppercase font-bold tracking-widest">Dica: No Android, habilite a permissão de câmera nas configurações do App.</p>
+        )}
       </div>
     );
   }
@@ -181,7 +211,9 @@ const App: React.FC = () => {
     <div className="relative w-full h-full flex overflow-hidden bg-black font-sans text-zinc-100 select-none">
       <div className="absolute inset-0 bg-zinc-950 cursor-move h-full overflow-hidden" 
         onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+        {/* O CameraView agora possui lógica de proteção HTTPS e fallback de hardware interna */}
         <CameraView deviceId={selectedCamera} mirror={config.mirror} />
+        
         <EyebrowOverlay config={config} activeHandle={draggingHandle} />
 
         <div className="absolute top-8 left-8 z-30 pointer-events-none">
@@ -211,7 +243,17 @@ const App: React.FC = () => {
 
       {isSidebarOpen && <div className="fixed inset-0 bg-transparent z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />}
       <div className={`fixed right-0 top-0 bottom-0 z-50 transition-all duration-500 ease-out h-full ${isSidebarOpen ? 'w-[320px] translate-x-0' : 'w-0 translate-x-full'} overflow-hidden bg-transparent`}>
-        <SidebarControls config={config} setConfig={setConfig} activeMode={activeMode} setActiveMode={setActiveMode} resetConfig={() => setConfig(INITIAL_BROW_CONFIG)} onSave={() => localStorage.setItem(STORAGE_KEY, JSON.stringify(config))} selectedCamera={selectedCamera} setSelectedCamera={setSelectedCamera} onClose={() => setIsSidebarOpen(false)} />
+        <SidebarControls 
+          config={config} 
+          setConfig={setConfig} 
+          activeMode={activeMode} 
+          setActiveMode={setActiveMode} 
+          resetConfig={() => setConfig(INITIAL_BROW_CONFIG)} 
+          onSave={() => localStorage.setItem(STORAGE_KEY, JSON.stringify(config))} 
+          selectedCamera={selectedCamera} 
+          setSelectedCamera={setSelectedCamera} 
+          onClose={() => setIsSidebarOpen(false)} 
+        />
       </div>
     </div>
   );
