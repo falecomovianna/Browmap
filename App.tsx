@@ -24,7 +24,21 @@ const App: React.FC = () => {
   const [activeMode, setActiveMode] = useState<ControlMode>('visagism');
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   
+  // Função para solicitar permissão explicitamente
+  const requestCameraPermission = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Se chegamos aqui, temos permissão. Paramos o stream inicial para o CameraView assumir.
+      stream.getTracks().forEach(track => track.stop());
+      setHasPermission(true);
+    } catch (err) {
+      console.error("Permissão negada:", err);
+      setHasPermission(false);
+    }
+  };
+
   useEffect(() => {
     const handleUnload = () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
@@ -132,6 +146,41 @@ const App: React.FC = () => {
     initialAngle.current = null;
   };
 
+  // Tela de Permissão
+  if (hasPermission !== true) {
+    return (
+      <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center mb-8 border border-amber-500/20">
+          <svg className="w-12 h-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+        <h1 className="text-amber-500 font-black text-2xl italic tracking-tighter mb-4">BROW MAP PRO</h1>
+        <p className="text-zinc-400 text-sm uppercase tracking-widest font-bold mb-10 max-w-xs leading-relaxed">
+          Para iniciar o mapeamento digital, precisamos acessar sua câmera.
+        </p>
+        
+        <button 
+          onClick={requestCameraPermission}
+          className="w-full max-w-xs py-5 bg-amber-500 text-black text-xs font-black uppercase rounded-2xl shadow-[0_10px_40px_rgba(245,158,11,0.3)] active:scale-95 transition-all mb-4"
+        >
+          {hasPermission === false ? "Tentar Novamente" : "Permitir Câmera"}
+        </button>
+        
+        {hasPermission === false && (
+          <p className="text-red-500 text-[10px] font-bold uppercase tracking-widest animate-pulse">
+            Acesso à câmera é obrigatório
+          </p>
+        )}
+        
+        <p className="absolute bottom-12 text-[9px] text-zinc-600 uppercase tracking-[0.4em]">
+          Professional Visagism Tools
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-full flex overflow-hidden bg-black font-sans text-zinc-100 select-none">
       <div 
@@ -142,6 +191,18 @@ const App: React.FC = () => {
       >
         <CameraView deviceId={selectedCamera} mirror={config.mirror} />
         <EyebrowOverlay config={config} />
+
+        {/* Nome do Aplicativo no Canto Superior Esquerdo */}
+        <div className="absolute top-8 left-8 z-30 pointer-events-none">
+          <div className="flex flex-col">
+            <span className="text-amber-500 font-black text-sm italic tracking-tighter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              BrowMap Pro
+            </span>
+            <span className="text-[7px] text-white font-bold uppercase tracking-[0.3em] opacity-80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              Digital Visagism
+            </span>
+          </div>
+        </div>
 
         {/* HUD de status inferior */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 pointer-events-none z-10">
