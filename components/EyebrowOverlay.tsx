@@ -1,12 +1,13 @@
 
 import React from 'react';
-import { BrowConfig, SideOffset } from '../types';
+import { BrowConfig, SideOffset, ActiveHandle } from '../types';
 
 interface EyebrowOverlayProps {
   config: BrowConfig;
+  activeHandle?: ActiveHandle | null;
 }
 
-const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config }) => {
+const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config, activeHandle }) => {
   const { 
     posX, posY, scale, rotation, 
     spacing, showGuides, showVisagismGrid, 
@@ -15,53 +16,50 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config }) => {
   } = config;
 
   const s = spacing / 2;
-  const leftStart = -s;
-  const rightStart = s;
 
-  // Pontos de ancoragem para a grade
-  const getPoints = (side: 'left' | 'right', offset: SideOffset) => {
+  // Função para criar o formato geométrico (Mapping Style da Foto)
+  const createMappingPath = (side: 'left' | 'right', offset: SideOffset) => {
     const isLeft = side === 'left';
     const dir = isLeft ? -1 : 1;
-    const startX = isLeft ? leftStart : rightStart;
-    
-    // Posições absolutas dentro do contexto transformado do SVG
-    const pStart = { x: startX + offset.x, y: offset.y };
-    const pArch = { x: startX + offset.x + (offset.width * 0.6 * dir), y: offset.y - offset.archHeight };
-    const pTail = { x: startX + offset.x + (offset.width * dir), y: offset.y + (offset.archHeight * 0.2) };
-    
-    return { pStart, pArch, pTail, thickness: offset.thickness };
-  };
+    const { width: w, archHeight: ah, thickness: t, bottomArch: ba } = offset;
 
-  const lPts = getPoints('left', leftOffset);
-  const rPts = getPoints('right', rightOffset);
-
-  const createHollowPath = (side: 'left' | 'right', offset: SideOffset) => {
-    const isLeft = side === 'left';
-    const dir = isLeft ? -1 : 1;
-    const { width: bW, archHeight: bH, thickness: t, curvature: curv } = offset;
-
-    const p1 = { x: 0, y: 0 };
-    const p2 = { x: bW * 0.6 * dir, y: -bH };
-    const p3 = { x: bW * dir, y: bH * 0.2 };
-
-    const p4 = { x: bW * dir, y: bH * 0.2 + 1 };
-    const p5 = { x: bW * 0.6 * dir, y: -bH + t };
-    const p6 = { x: 0, y: t };
+    const pTopStart = { x: 0, y: 0 };
+    const pTopArch = { x: w * 0.62 * dir, y: -ah };
+    const pTail = { x: w * dir, y: ah * 0.4 };
+    const pBottomArch = { x: w * 0.60 * dir, y: -ah + t + ba };
+    const pBottomStart = { x: 0, y: t };
 
     return `
-      M ${p1.x} ${p1.y} 
-      Q ${bW * 0.3 * dir} ${-curv * 15}, ${p2.x} ${p2.y}
-      Q ${bW * 0.85 * dir} ${p2.y + 5}, ${p3.x} ${p3.y}
-      L ${p4.x} ${p4.y}
-      Q ${bW * 0.85 * dir} ${p5.y + 5}, ${p5.x} ${p5.y}
-      Q ${bW * 0.3 * dir} ${p6.y - (curv * 10)}, ${p6.x} ${p6.y}
+      M ${pTopStart.x} ${pTopStart.y}
+      L ${pTopArch.x} ${pTopArch.y}
+      L ${pTail.x} ${pTail.y}
+      L ${pBottomArch.x} ${pBottomArch.y}
+      L ${pBottomStart.x} ${pBottomStart.y}
       Z
     `;
   };
 
+  const getPoints = (side: 'left' | 'right', offset: SideOffset) => {
+    const isLeft = side === 'left';
+    const dir = isLeft ? -1 : 1;
+    const startX = (isLeft ? -s : s) + offset.x;
+    const { width: w, archHeight: ah, thickness: t, bottomArch: ba } = offset;
+    
+    return {
+      topStart: { x: startX, y: offset.y },
+      bottomStart: { x: startX, y: offset.y + t },
+      topArch: { x: startX + (w * 0.62 * dir), y: offset.y - ah },
+      bottomArch: { x: startX + (w * 0.60 * dir), y: offset.y - ah + t + ba },
+      tail: { x: startX + (w * dir), y: offset.y + (ah * 0.4) }
+    };
+  };
+
+  const l = getPoints('left', leftOffset);
+  const r = getPoints('right', rightOffset);
+
   const getSideTransform = (side: 'left' | 'right') => {
     const off = side === 'left' ? leftOffset : rightOffset;
-    const startX = side === 'left' ? leftStart : rightStart;
+    const startX = side === 'left' ? -s : s;
     return `translate(${startX + off.x}, ${off.y}) rotate(${off.rotation}) scale(${off.scale})`;
   };
 
@@ -72,74 +70,71 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config }) => {
         className="w-full h-full overflow-visible"
         style={{ transform: `translate(${posX}px, ${posY}px) rotate(${rotation}deg) scale(${scale})` }}
       >
-        {/* GRADE DE VISAGISMO PROFISSIONAL */}
         {showVisagismGrid && (
-          <g stroke={color} strokeWidth="0.4" opacity={opacity * 0.5}>
-            {/* Eixo Central */}
-            <line x1="0" y1="-350" x2="0" y2="350" strokeWidth="1" />
+          <g stroke="#000" strokeWidth="0.8" opacity="0.6">
+            {/* Linhas Verticais e Grid de Cruzamento da Foto */}
+            <line x1={l.topStart.x} y1="-300" x2={l.topStart.x} y2="300" strokeWidth="1" />
+            <line x1={r.topStart.x} y1="-300" x2={r.topStart.x} y2="300" strokeWidth="1" />
+            
+            {/* Triângulo de Base do Nariz (V-Shape) */}
+            <line x1="0" y1="280" x2={l.tail.x} y2={l.tail.y} />
+            <line x1="0" y1="280" x2={r.tail.x} y2={r.tail.y} />
+            <line x1="0" y1="280" x2={l.topStart.x} y2={l.topStart.y} />
+            <line x1="0" y1="280" x2={r.topStart.x} y2={r.topStart.y} />
 
-            {/* Verticais de Início */}
-            <line x1={lPts.pStart.x} y1="-300" x2={lPts.pStart.x} y2="300" />
-            <line x1={rPts.pStart.x} y1="-300" x2={rPts.pStart.x} y2="300" />
-
-            {/* Verticais de Ponto Alto */}
-            <line x1={lPts.pArch.x} y1="-300" x2={lPts.pArch.x} y2="300" strokeDasharray="3,3" />
-            <line x1={rPts.pArch.x} y1="-300" x2={rPts.pArch.x} y2="300" strokeDasharray="3,3" />
-
-            {/* Horizontais de Simetria */}
-            <line x1="-200" y1={lPts.pStart.y} x2="200" y2={rPts.pStart.y} />
-            <line x1="-200" y1={lPts.pArch.y} x2="200" y2={rPts.pArch.y} />
-            <line x1="-200" y1={lPts.pStart.y + lPts.thickness} x2="200" y2={rPts.pStart.y + rPts.thickness} />
-
-            {/* Cruzamento de Mapeamento (X Central) */}
-            <line x1={lPts.pStart.x} y1={lPts.pStart.y} x2={rPts.pStart.x} y2={rPts.pArch.y} />
-            <line x1={rPts.pStart.x} y1={rPts.pStart.y} x2={lPts.pStart.x} y2={lPts.pArch.y} />
-
-            {/* Guia de Cauda (V invertido) */}
-            <line x1="0" y1="200" x2={lPts.pTail.x} y2={lPts.pTail.y} />
-            <line x1="0" y1="200" x2={rPts.pTail.x} y2={rPts.pTail.y} />
+            {/* Cruzamentos Centrais Forehead */}
+            <line x1={l.topStart.x} y1={l.topStart.y} x2={r.topArch.x} y2={r.topArch.y} strokeWidth="0.4" />
+            <line x1={r.topStart.x} y1={r.topStart.y} x2={l.topArch.x} y2={l.topArch.y} strokeWidth="0.4" />
+            <line x1={l.topStart.x} y1={l.topStart.y - 30} x2={r.topArch.x} y2={r.topArch.y} strokeWidth="0.3" strokeDasharray="2,2" />
+            <line x1={r.topStart.x} y1={r.topStart.y - 30} x2={l.topArch.x} y2={l.topArch.y} strokeWidth="0.3" strokeDasharray="2,2" />
           </g>
         )}
 
-        {/* MOLDES DE SOBRANCELHA */}
         <g fill="none">
-          {/* LADO ESQUERDO */}
-          <g transform={getSideTransform('left')} opacity={opacity}>
-            <path 
-              d={createHollowPath('left', leftOffset)} 
-              stroke={color} 
-              strokeWidth={targetSide === 'left' ? "2.5" : "1"} 
-              className={targetSide === 'left' ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]" : ""}
-            />
-          </g>
-          
-          {/* LADO DIREITO */}
-          <g transform={getSideTransform('right')} opacity={opacity}>
-            <path 
-              d={createHollowPath('right', rightOffset)} 
-              stroke={color} 
-              strokeWidth={targetSide === 'right' ? "2.5" : "1"}
-              className={targetSide === 'right' ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]" : ""}
-            />
-          </g>
+          {['left', 'right'].map((side) => (
+            <g key={side} transform={getSideTransform(side as 'left' | 'right')} opacity={opacity}>
+              <path 
+                d={createMappingPath(side as 'left' | 'right', side === 'left' ? leftOffset : rightOffset)} 
+                stroke={color} 
+                strokeWidth={targetSide === side ? "2.5" : "1.2"}
+                fill={color}
+                fillOpacity="0.08"
+              />
+            </g>
+          ))}
         </g>
 
-        {/* HANDLES DE CONTROLE */}
         {showGuides && (
-          <g fill={color} stroke="#000" strokeWidth="0.5">
+          <g fill={color} stroke="#000" strokeWidth="0.6">
             {['left', 'right'].map((side) => {
               const s = side as 'left' | 'right';
               const off = s === 'left' ? leftOffset : rightOffset;
               const dir = s === 'left' ? -1 : 1;
+              const isActiveSide = targetSide === 'both' || targetSide === s;
+              const isType = (t: string) => activeHandle?.side === s && activeHandle?.type === t;
+              
+              const radius = (t: string) => isType(t) ? handleSize * 1.6 : handleSize;
+
               return (
-                <g key={s} transform={getSideTransform(s)} opacity={targetSide === 'both' || targetSide === s ? 1 : 0.3}>
-                  <circle cx={0} cy={0} r={handleSize} />
-                  <circle cx={0} cy={off.thickness} r={handleSize} />
-                  <circle cx={off.width * 0.6 * dir} cy={-off.archHeight} r={handleSize} />
-                  <circle cx={off.width * dir} cy={off.archHeight * 0.2} r={handleSize} />
+                <g key={s} transform={getSideTransform(s)} opacity={isActiveSide ? 1 : 0.4}>
+                  <circle cx={0} cy={0} r={radius('pos')} />
+                  <circle cx={0} cy={off.thickness} r={radius('thickness')} />
+                  <circle cx={off.width * 0.62 * dir} cy={-off.archHeight} r={radius('arch')} />
+                  <circle cx={off.width * 0.60 * dir} cy={-off.archHeight + off.thickness + off.bottomArch} r={radius('bottomArch')} />
+                  <circle cx={off.width * dir} cy={off.archHeight * 0.4} r={radius('width')} />
                 </g>
               );
             })}
+
+            {/* Pontos Amarelos de Intersecção Central (Yellow Dots) */}
+            {showVisagismGrid && (
+              <g opacity="0.9">
+                 <circle cx="0" cy={l.topStart.y - 15} r={handleSize * 0.7} />
+                 <circle cx="0" cy={l.topStart.y - 45} r={handleSize * 0.7} />
+                 <circle cx="0" cy={l.topStart.y - 75} r={handleSize * 0.7} />
+                 <circle cx="0" cy={l.topStart.y + 10} r={handleSize * 0.7} />
+              </g>
+            )}
           </g>
         )}
       </svg>

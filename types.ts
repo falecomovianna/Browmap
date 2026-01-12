@@ -4,9 +4,9 @@ export interface SideOffset {
   y: number;
   scale: number;
   rotation: number;
-  // Propriedades de forma individuais para cada lado
   width: number;
   archHeight: number;
+  bottomArch: number;
   thickness: number;
   curvature: number;
 }
@@ -19,6 +19,7 @@ export interface BrowConfig {
   thickness: number;
   curvature: number;
   archHeight: number;
+  bottomArch: number;
   width: number;
   spacing: number;
   showGuides: boolean;
@@ -33,3 +34,10 @@ export interface BrowConfig {
 }
 
 export type ControlMode = 'position' | 'shape' | 'visagism' | 'style' | 'camera';
+
+export type HandleType = 'pos' | 'width' | 'arch' | 'thickness' | 'bottomArch';
+
+export interface ActiveHandle {
+  side: 'left' | 'right';
+  type: HandleType;
+}

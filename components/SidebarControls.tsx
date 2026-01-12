@@ -47,7 +47,7 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
   const updateValue = (key: string, val: number) => {
     const offsetKeyMap: Record<string, string> = {
       'posX': 'x', 'posY': 'y', 'scale': 'scale', 'rotation': 'rotation',
-      'width': 'width', 'archHeight': 'archHeight', 'thickness': 'thickness', 'curvature': 'curvature'
+      'width': 'width', 'archHeight': 'archHeight', 'bottomArch': 'bottomArch', 'thickness': 'thickness', 'curvature': 'curvature'
     };
     const offsetKey = offsetKeyMap[key];
 
@@ -76,7 +76,7 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
     const off = config.targetSide === 'left' ? config.leftOffset : config.rightOffset;
     const offsetKeyMap: Record<string, string> = {
       'posX': 'x', 'posY': 'y', 'scale': 'scale', 'rotation': 'rotation',
-      'width': 'width', 'archHeight': 'archHeight', 'thickness': 'thickness', 'curvature': 'curvature'
+      'width': 'width', 'archHeight': 'archHeight', 'bottomArch': 'bottomArch', 'thickness': 'thickness', 'curvature': 'curvature'
     };
     const offsetKey = offsetKeyMap[key];
     return offsetKey ? (off as any)[offsetKey] : (config as any)[key];
@@ -100,7 +100,6 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col p-6 overflow-y-auto scrollbar-hide select-none bg-transparent">
-      {/* Cabeçalho do menu */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex flex-col">
           <h1 className="text-amber-500 font-black text-xl italic tracking-tighter drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">BROW MAP PRO</h1>
@@ -113,7 +112,6 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
         </button>
       </div>
 
-      {/* Navegação de Modos */}
       <div className="grid grid-cols-5 gap-1 mb-8">
         {(['visagism', 'position', 'shape', 'style', 'camera'] as ControlMode[]).map(mode => (
           <button
@@ -128,7 +126,6 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
       </div>
 
       <div className="flex-1">
-        {/* Seletor de Lado */}
         {(activeMode === 'position' || activeMode === 'shape') && (
           <div className="flex gap-1.5 mb-10">
             {['left', 'both', 'right'].map(side => (
@@ -144,7 +141,6 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
           </div>
         )}
 
-        {/* Controles de Visagismo */}
         {activeMode === 'visagism' && (
           <div className="space-y-8">
             <div className="flex items-center justify-between p-4 bg-black/60 rounded-2xl border border-white/10 shadow-xl">
@@ -163,7 +159,6 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
           </div>
         )}
 
-        {/* Controles de Posição */}
         {activeMode === 'position' && (
           <div className="space-y-2">
             <Slider label="Eixo Vertical" value={getDisplayValue('posY')} min={-400} max={400} step={1} onChange={(v: number) => updateValue('posY', v)} />
@@ -174,17 +169,16 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
           </div>
         )}
 
-        {/* Controles de Forma */}
         {activeMode === 'shape' && (
           <div className="space-y-2">
             <Slider label="Comprimento" value={getDisplayValue('width')} min={30} max={350} step={1} onChange={(v: number) => updateValue('width', v)} />
-            <Slider label="Altura do Arco" value={getDisplayValue('archHeight')} min={0} max={120} step={1} onChange={(v: number) => updateValue('archHeight', v)} />
-            <Slider label="Espessura da Linha" value={getDisplayValue('thickness')} min={1} max={50} step={0.5} onChange={(v: number) => updateValue('thickness', v)} />
+            <Slider label="Arco Superior" value={getDisplayValue('archHeight')} min={0} max={120} step={1} onChange={(v: number) => updateValue('archHeight', v)} />
+            <Slider label="Arco Inferior" value={getDisplayValue('bottomArch')} min={-40} max={80} step={1} onChange={(v: number) => updateValue('bottomArch', v)} />
+            <Slider label="Espessura Inicial" value={getDisplayValue('thickness')} min={1} max={50} step={0.5} onChange={(v: number) => updateValue('thickness', v)} />
             <Slider label="Curvatura Superior" value={getDisplayValue('curvature')} min={0} max={3.0} step={0.05} precision={2} onChange={(v: number) => updateValue('curvature', v)} />
           </div>
         )}
 
-        {/* Estilo e Cor */}
         {activeMode === 'style' && (
           <div className="space-y-10">
             <Slider label="Opacidade do Molde" value={config.opacity} min={0.05} max={1} step={0.05} precision={2} onChange={(v: number) => setConfig(p => ({ ...p, opacity: v }))} />
@@ -203,7 +197,6 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
           </div>
         )}
 
-        {/* Seleção de Câmera */}
         {activeMode === 'camera' && (
           <div className="space-y-3">
             <label className="text-[10px] font-black uppercase text-white block mb-2 tracking-[0.2em] drop-shadow-md">Selecione a Lente</label>
@@ -216,7 +209,6 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
         )}
       </div>
 
-      {/* Ações Inferiores */}
       <div className="mt-8 space-y-3 pb-safe">
         <button onClick={handleSave} className={`w-full py-5 text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl flex items-center justify-center gap-3 ${saveStatus === 'saved' ? 'bg-green-600 text-white shadow-green-500/30' : 'bg-amber-500 text-black active:scale-95 shadow-amber-500/40'}`}>
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
