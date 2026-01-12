@@ -4,7 +4,7 @@ export interface SideOffset {
   y: number;
   scale: number;
   rotation: number;
-  // Propriedades de forma individuais
+  // Propriedades de forma individuais para cada lado
   width: number;
   archHeight: number;
   thickness: number;

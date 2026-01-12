@@ -18,29 +18,26 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config }) => {
   const leftStart = -s;
   const rightStart = s;
 
-  // Calculamos pontos de referência baseados nos offsets para a grade seguir os moldes
+  // Pontos de ancoragem para a grade
   const getPoints = (side: 'left' | 'right', offset: SideOffset) => {
     const isLeft = side === 'left';
     const dir = isLeft ? -1 : 1;
     const startX = isLeft ? leftStart : rightStart;
     
-    // Ponto inicial (base)
+    // Posições absolutas dentro do contexto transformado do SVG
     const pStart = { x: startX + offset.x, y: offset.y };
-    // Ponto alto (arco)
     const pArch = { x: startX + offset.x + (offset.width * 0.6 * dir), y: offset.y - offset.archHeight };
-    // Ponto final (cauda)
-    const pTail = { x: startX + offset.x + (offset.width * dir), y: offset.y + (offset.archHeight * 0.3) };
+    const pTail = { x: startX + offset.x + (offset.width * dir), y: offset.y + (offset.archHeight * 0.2) };
     
     return { pStart, pArch, pTail, thickness: offset.thickness };
   };
 
-  const lPoints = getPoints('left', leftOffset);
-  const rPoints = getPoints('right', rightOffset);
+  const lPts = getPoints('left', leftOffset);
+  const rPts = getPoints('right', rightOffset);
 
   const createHollowPath = (side: 'left' | 'right', offset: SideOffset) => {
     const isLeft = side === 'left';
     const dir = isLeft ? -1 : 1;
-    
     const { width: bW, archHeight: bH, thickness: t, curvature: curv } = offset;
 
     const p1 = { x: 0, y: 0 };
@@ -75,83 +72,71 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config }) => {
         className="w-full h-full overflow-visible"
         style={{ transform: `translate(${posX}px, ${posY}px) rotate(${rotation}deg) scale(${scale})` }}
       >
-        {/* GRADE TÉCNICA DE VISAGISMO (Conforme imagem de referência) */}
+        {/* GRADE DE VISAGISMO PROFISSIONAL */}
         {showVisagismGrid && (
-          <g stroke={color} strokeWidth="0.3" opacity={opacity * 0.5}>
-            {/* Eixo Central Vertical */}
-            <line x1="0" y1="-300" x2="0" y2="300" strokeWidth="0.8" />
+          <g stroke={color} strokeWidth="0.4" opacity={opacity * 0.5}>
+            {/* Eixo Central */}
+            <line x1="0" y1="-350" x2="0" y2="350" strokeWidth="1" />
 
-            {/* Verticais de Início (Glabela) */}
-            <line x1={lPoints.pStart.x} y1="-250" x2={lPoints.pStart.x} y2="250" />
-            <line x1={rPoints.pStart.x} y1="-250" x2={rPoints.pStart.x} y2="250" />
+            {/* Verticais de Início */}
+            <line x1={lPts.pStart.x} y1="-300" x2={lPts.pStart.x} y2="300" />
+            <line x1={rPts.pStart.x} y1="-300" x2={rPts.pStart.x} y2="300" />
 
-            {/* Verticais dos Arcos (Pontos Altos) */}
-            <line x1={lPoints.pArch.x} y1="-250" x2={lPoints.pArch.x} y2="250" strokeDasharray="2,2" />
-            <line x1={rPoints.pArch.x} y1="-250" x2={rPoints.pArch.x} y2="250" strokeDasharray="2,2" />
+            {/* Verticais de Ponto Alto */}
+            <line x1={lPts.pArch.x} y1="-300" x2={lPts.pArch.x} y2="300" strokeDasharray="3,3" />
+            <line x1={rPts.pArch.x} y1="-300" x2={rPts.pArch.x} y2="300" strokeDasharray="3,3" />
 
-            {/* Linhas Horizontais de Simetria */}
-            {/* Base (Início inferior) */}
-            <line x1="-200" y1={lPoints.pStart.y} x2="200" y2={rPoints.pStart.y} />
-            {/* Topo do Início */}
-            <line x1="-200" y1={lPoints.pStart.y + lPoints.thickness} x2="200" y2={rPoints.pStart.y + rPoints.thickness} />
-            {/* Ponto Alto (Arco) */}
-            <line x1="-200" y1={lPoints.pArch.y} x2="200" y2={rPoints.pArch.y} />
+            {/* Horizontais de Simetria */}
+            <line x1="-200" y1={lPts.pStart.y} x2="200" y2={rPts.pStart.y} />
+            <line x1="-200" y1={lPts.pArch.y} x2="200" y2={rPts.pArch.y} />
+            <line x1="-200" y1={lPts.pStart.y + lPts.thickness} x2="200" y2={rPts.pStart.y + rPts.thickness} />
 
-            {/* Mapeamento Cruzado (X Central) */}
-            <line x1={lPoints.pStart.x} y1={lPoints.pStart.y} x2={rPoints.pStart.x} y2={rPoints.pArch.y} />
-            <line x1={rPoints.pStart.x} y1={rPoints.pStart.y} x2={lPoints.pStart.x} y2={lPoints.pArch.y} />
+            {/* Cruzamento de Mapeamento (X Central) */}
+            <line x1={lPts.pStart.x} y1={lPts.pStart.y} x2={rPts.pStart.x} y2={rPts.pArch.y} />
+            <line x1={rPts.pStart.x} y1={rPts.pStart.y} x2={lPts.pStart.x} y2={lPts.pArch.y} />
 
-            {/* Linhas de Cauda (V de mapeamento) */}
-            <line x1="0" y1="200" x2={lPoints.pTail.x} y2={lPoints.pTail.y} />
-            <line x1="0" y1="200" x2={rPoints.pTail.x} y2={rPoints.pTail.y} />
-            
-            {/* Cruzamento inferior para altura das sobrancelhas */}
-            <line x1={lPoints.pStart.x} y1={lPoints.pStart.y} x2={rPoints.pStart.x} y2={rPoints.pStart.y} strokeWidth="1" />
+            {/* Guia de Cauda (V invertido) */}
+            <line x1="0" y1="200" x2={lPts.pTail.x} y2={lPts.pTail.y} />
+            <line x1="0" y1="200" x2={rPts.pTail.x} y2={rPts.pTail.y} />
           </g>
         )}
 
-        {/* MOLDES INDIVIDUAIS */}
+        {/* MOLDES DE SOBRANCELHA */}
         <g fill="none">
-          {/* Sobrancelha Esquerda */}
+          {/* LADO ESQUERDO */}
           <g transform={getSideTransform('left')} opacity={opacity}>
             <path 
               d={createHollowPath('left', leftOffset)} 
               stroke={color} 
               strokeWidth={targetSide === 'left' ? "2.5" : "1"} 
-              className={targetSide === 'left' ? "drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" : ""}
+              className={targetSide === 'left' ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]" : ""}
             />
           </g>
           
-          {/* Sobrancelha Direita */}
+          {/* LADO DIREITO */}
           <g transform={getSideTransform('right')} opacity={opacity}>
             <path 
               d={createHollowPath('right', rightOffset)} 
               stroke={color} 
               strokeWidth={targetSide === 'right' ? "2.5" : "1"}
-              className={targetSide === 'right' ? "drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" : ""}
+              className={targetSide === 'right' ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]" : ""}
             />
           </g>
         </g>
 
-        {/* PONTOS DE CONTROLE (HANDLES) */}
+        {/* HANDLES DE CONTROLE */}
         {showGuides && (
-          <g fill={color} stroke="#000" strokeWidth="0.3">
+          <g fill={color} stroke="#000" strokeWidth="0.5">
             {['left', 'right'].map((side) => {
-              const isLeft = side === 'left';
-              const off = isLeft ? leftOffset : rightOffset;
-              const dir = isLeft ? -1 : 1;
-              const { width: bW, archHeight: bH, thickness: t } = off;
-              
+              const s = side as 'left' | 'right';
+              const off = s === 'left' ? leftOffset : rightOffset;
+              const dir = s === 'left' ? -1 : 1;
               return (
-                <g key={side} transform={getSideTransform(side as 'left' | 'right')} opacity={targetSide === 'both' || targetSide === side ? 1 : 0.2}>
-                  {/* Início Inferior */}
+                <g key={s} transform={getSideTransform(s)} opacity={targetSide === 'both' || targetSide === s ? 1 : 0.3}>
                   <circle cx={0} cy={0} r={handleSize} />
-                  {/* Início Superior */}
-                  <circle cx={0} cy={t} r={handleSize} />
-                  {/* Ponto Alto (Arco) */}
-                  <circle cx={bW * 0.6 * dir} cy={-bH} r={handleSize} />
-                  {/* Cauda */}
-                  <circle cx={bW * dir} cy={bH * 0.3} r={handleSize} />
+                  <circle cx={0} cy={off.thickness} r={handleSize} />
+                  <circle cx={off.width * 0.6 * dir} cy={-off.archHeight} r={handleSize} />
+                  <circle cx={off.width * dir} cy={off.archHeight * 0.2} r={handleSize} />
                 </g>
               );
             })}

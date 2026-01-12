@@ -6,17 +6,15 @@ import SidebarControls from './components/SidebarControls';
 import { INITIAL_BROW_CONFIG } from './constants';
 import { BrowConfig, ControlMode } from './types';
 
-const STORAGE_KEY = 'brow_map_pro_config';
+const STORAGE_KEY = 'brow_map_pro_v2_config';
 
 const App: React.FC = () => {
-  // Inicializa o estado tentando carregar do localStorage
   const [config, setConfig] = useState<BrowConfig>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        console.error("Erro ao carregar configurações salvas:", e);
         return INITIAL_BROW_CONFIG;
       }
     }
@@ -25,19 +23,8 @@ const App: React.FC = () => {
 
   const [activeMode, setActiveMode] = useState<ControlMode>('visagism');
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  useEffect(() => {
-    const handleResize = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Salva automaticamente no localStorage sempre que houver mudanças críticas (opcional, mas profissional)
-  // O usuário pediu especificamente um botão, mas manteremos o auto-save para garantir que não se perca nada.
   useEffect(() => {
     const handleUnload = () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
@@ -58,7 +45,7 @@ const App: React.FC = () => {
   const initialRotation = useRef<number>(0);
 
   const resetConfig = useCallback(() => {
-    if (confirm("Deseja redefinir todas as marcações para o padrão de fábrica?")) {
+    if (confirm("Deseja redefinir todas as marcações para o padrão profissional?")) {
       setConfig(INITIAL_BROW_CONFIG);
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -103,7 +90,7 @@ const App: React.FC = () => {
       if (config.targetSide === 'both') {
         setConfig(prev => ({
           ...prev,
-          posX: prev.posX + (prev.mirror ? -dx : dx),
+          posX: prev.posX + dx,
           posY: prev.posY + dy
         }));
       } else {
@@ -112,7 +99,7 @@ const App: React.FC = () => {
           ...prev,
           [sideKey]: { 
             ...prev[sideKey], 
-            x: prev[sideKey].x + (prev.mirror ? -dx : dx),
+            x: prev[sideKey].x + dx,
             y: prev[sideKey].y + dy 
           }
         }));
@@ -121,7 +108,7 @@ const App: React.FC = () => {
     } else if (e.touches.length === 2 && initialDist.current !== null && initialAngle.current !== null) {
       const currentDist = getDistance(e.touches[0], e.touches[1]);
       const scaleFactor = currentDist / initialDist.current;
-      const newScale = Math.min(Math.max(initialScale.current * scaleFactor, 0.4), 3.5);
+      const newScale = Math.min(Math.max(initialScale.current * scaleFactor, 0.2), 5.0);
 
       const currentAngle = getAngle(e.touches[0], e.touches[1]);
       const angleDiff = currentAngle - initialAngle.current;
@@ -147,41 +134,43 @@ const App: React.FC = () => {
 
   return (
     <div className="relative w-full h-full flex overflow-hidden bg-black font-sans text-zinc-100 select-none">
-      {!isLandscape && (
-        <div className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center p-8 text-center md:hidden">
-          <div className="w-24 h-24 mb-6 border-4 border-amber-500 rounded-2xl flex items-center justify-center animate-rotate">
-            <svg className="w-12 h-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-black text-amber-500 mb-2">MODO HORIZONTAL</h2>
-          <button onClick={() => setIsLandscape(true)} className="mt-8 px-6 py-3 bg-zinc-800 rounded-full text-xs font-bold uppercase tracking-widest text-zinc-300">Continuar</button>
-        </div>
-      )}
-
-      <div className="absolute inset-0 bg-zinc-950 cursor-move h-full overflow-hidden" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+      <div 
+        className="absolute inset-0 bg-zinc-950 cursor-move h-full overflow-hidden" 
+        onTouchStart={handleTouchStart} 
+        onTouchMove={handleTouchMove} 
+        onTouchEnd={handleTouchEnd}
+      >
         <CameraView deviceId={selectedCamera} mirror={config.mirror} />
         <EyebrowOverlay config={config} />
 
-        <div className="absolute bottom-6 left-6 pointer-events-none opacity-50 drop-shadow-lg">
-          <div className="bg-black/30 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 flex items-center gap-3">
-             <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-             <span className="text-[10px] font-black text-white uppercase tracking-widest">
-               {config.targetSide === 'both' ? 'Sincronia Ativa' : config.targetSide === 'left' ? 'Ajustando Esquerda' : 'Ajustando Direita'}
+        {/* HUD de status inferior */}
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 pointer-events-none z-10">
+          <div className="bg-black/30 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 flex items-center gap-3 shadow-2xl">
+             <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+             <span className="text-[11px] font-black text-white uppercase tracking-widest whitespace-nowrap drop-shadow-md">
+               {config.targetSide === 'both' ? 'Sincronia Global' : config.targetSide === 'left' ? 'Ajuste: Esquerda' : 'Ajuste: Direita'}
              </span>
           </div>
         </div>
 
         {!isSidebarOpen && (
-          <button onClick={() => setIsSidebarOpen(true)} className="absolute top-6 right-6 p-4 bg-amber-500/90 backdrop-blur-md text-black rounded-2xl shadow-2xl active:scale-95 z-10">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <button 
+            onClick={() => setIsSidebarOpen(true)} 
+            className="absolute top-8 right-8 p-5 bg-amber-500 text-black rounded-3xl shadow-[0_10px_40px_rgba(245,158,11,0.4)] active:scale-90 z-30 transition-transform"
+          >
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 6h16M4 12h16m-7 6h7" />
             </svg>
           </button>
         )}
       </div>
 
-      <div className={`fixed right-0 top-0 bottom-0 z-20 transition-all duration-300 h-full ${isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 translate-x-full'} overflow-hidden bg-transparent`}>
+      {isSidebarOpen && (
+        <div className="fixed inset-0 bg-transparent z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
+      )}
+
+      {/* Painel Lateral - TOTALMENTE TRANSPARENTE (apenas os botões aparecerão) */}
+      <div className={`fixed right-0 top-0 bottom-0 z-50 transition-all duration-500 ease-out h-full ${isSidebarOpen ? 'w-[320px] translate-x-0' : 'w-0 translate-x-full'} overflow-hidden bg-transparent`}>
         <SidebarControls 
           config={config} 
           setConfig={setConfig} 
