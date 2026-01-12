@@ -9,56 +9,20 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        
-        :root { --amber-primary: #f59e0b; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #000;
-            margin: 0;
-            color: white;
-            overflow: hidden;
-            touch-action: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
+        :root { --amber-primary: #ffff00; }
+        body { font-family: 'Inter', sans-serif; background-color: #000; margin: 0; color: white; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; }
         #camera-layer { position: fixed; inset: 0; z-index: 1; background: #000; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-
-        .glass-panel {
-            background: rgba(18, 18, 18, 0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .brow-guide {
-            stroke: var(--amber-primary);
-            stroke-width: 2.5;
-            fill: rgba(245, 158, 11, 0.1);
-            filter: drop-shadow(0 0 5px rgba(0,0,0,0.8));
-        }
-
-        .guide-line {
-            stroke: var(--amber-primary);
-            stroke-width: 1;
-            stroke-dasharray: 6 4;
-            opacity: 0.5;
-        }
-
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.2); }
-            50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.5); }
-        }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .mirrored { transform: scaleX(-1); }
+        .glass-panel { background: rgba(18, 18, 18, 0.75); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .brow-guide { stroke: #000; stroke-width: 0.8; fill: rgba(255, 255, 0, 0.15); stroke-linejoin: miter; }
+        .guide-line { stroke: #000; stroke-width: 0.5; opacity: 0.5; }
+        .marker-dot { fill: var(--amber-primary); stroke: #000; stroke-width: 0.5; }
+        @keyframes glow { 0%, 100% { box-shadow: 0 0 5px rgba(255, 255, 0, 0.2); } 50% { box-shadow: 0 0 25px rgba(255, 255, 0, 0.4); } }
         .btn-glow { animation: glow 3s infinite; }
-
         input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; }
         input[type=range]::-webkit-slider-runnable-track { background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 24px; width: 24px; background: var(--amber-primary);
-            border-radius: 50%; border: 2px solid white; margin-top: -9px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-        }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; background: var(--amber-primary); border-radius: 50%; border: 2px solid #000; margin-top: -9px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
     </style>
 <script type="importmap">
 {
@@ -71,104 +35,76 @@
 </head>
 <body>
 
-    <!-- Splash Screen: OBRIGATÓRIO para permissão da câmera em navegadores móveis -->
     <div id="splash" class="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-8 text-center transition-opacity duration-500">
-        <div class="absolute inset-0 opacity-20 pointer-events-none">
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-gradient-to-tr from-amber-900/40 to-black blur-[120px]"></div>
-        </div>
-
         <div class="relative z-10 space-y-10 max-w-sm w-full">
             <div class="mx-auto w-28 h-28 bg-zinc-900 rounded-[3rem] border border-white/10 flex items-center justify-center shadow-2xl relative">
-                <div class="absolute inset-0 bg-amber-500/10 rounded-[3rem] animate-pulse"></div>
-                <svg class="w-14 h-14 text-amber-500 relative" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
+                <div class="absolute inset-0 bg-yellow-500/10 rounded-[3rem] animate-pulse"></div>
+                <svg class="w-14 h-14 text-yellow-500 relative" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
             </div>
-
             <div class="space-y-3">
-                <h1 class="text-5xl font-black italic tracking-tighter text-white uppercase">BrowMap <span class="text-amber-500">Pro</span></h1>
-                <p class="text-zinc-500 text-sm font-medium px-4 leading-relaxed">Ferramenta Profissional de Visagismo.<br>Ative sua câmera para iniciar a análise facial.</p>
+                <h1 class="text-5xl font-black italic tracking-tighter text-white uppercase">BrowMap <span class="text-yellow-500">Pro</span></h1>
+                <p class="text-zinc-500 text-sm font-medium px-4 leading-relaxed">Ferramenta Profissional de Visagismo.<br>Sistema de Mapeamento Geométrico.</p>
             </div>
-
-            <button id="btn-activate" class="w-full py-6 bg-amber-500 text-black font-black uppercase text-xs tracking-widest rounded-full btn-glow active:scale-95 transition-all shadow-2xl">
-                Ativar Câmera Profissional
-            </button>
-
-            <div id="error-box" class="hidden p-5 bg-red-500/10 border border-red-500/20 rounded-3xl animate-bounce">
-                <p id="error-text" class="text-red-400 text-xs font-bold uppercase tracking-widest leading-normal"></p>
-                <button onclick="location.reload()" class="mt-3 text-white text-[10px] underline uppercase font-black tracking-widest">Tentar Novamente</button>
-            </div>
+            <button id="btn-activate" class="w-full py-6 bg-yellow-400 text-black font-black uppercase text-xs tracking-widest rounded-full btn-glow active:scale-95 transition-all shadow-2xl">Ativar Mapeamento</button>
         </div>
-        
-        <div class="absolute bottom-12 text-[10px] text-zinc-600 font-bold uppercase tracking-[0.5em]">Laboratório de Precisão • 2025</div>
     </div>
 
-    <!-- App Interface -->
     <div id="app-content" class="hidden opacity-0 transition-opacity duration-700">
-        <div id="camera-layer">
-            <video id="video-feed" autoplay playsinline muted></video>
-        </div>
-
-        <!-- Visagism Overlay -->
+        <div id="camera-layer"><video id="video-feed" autoplay playsinline muted></video></div>
         <div class="fixed inset-0 z-10 pointer-events-none">
             <svg id="guides-svg" class="w-full h-full" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
                 <g id="transform-group" transform="translate(200, 250)">
-                    <line x1="0" y1="-300" x2="0" y2="300" class="guide-line" />
-                    <line x1="-200" y1="0" x2="200" y2="0" class="guide-line" opacity="0.4" />
+                    <g id="professional-grid">
+                        <line x1="0" y1="-300" x2="0" y2="300" class="guide-line" />
+                        <line x1="-30" y1="-150" x2="-30" y2="150" class="guide-line" />
+                        <line x1="30" y1="-150" x2="30" y2="150" class="guide-line" />
+                        <line x1="0" y1="340" x2="-140" y2="10" class="guide-line" opacity="0.2" />
+                        <line x1="0" y1="340" x2="140" y2="10" class="guide-line" opacity="0.2" />
+                    </g>
+                    <!-- Formato Geométrico (Linhas de Régua) -->
+                    <path id="left-brow" class="brow-guide" d="M -30,0 L -90,-40 L -140,10 L -85,20 L -30,15 Z" />
+                    <path id="right-brow" class="brow-guide" d="M 30,0 L 90,-40 L 140,10 L 85,20 L 30,15 Z" />
                     
-                    <!-- Left Brow -->
-                    <path id="left-brow" class="brow-guide" d="M -85,0 Q -45,-40 15,5 L 10,20 Q 8,17 -85,20 Z" transform="translate(-25, 0)" />
-                    <!-- Right Brow -->
-                    <path id="right-brow" class="brow-guide" d="M 85,0 Q 45,-40 -15,5 L -10,20 Q -8,17 85,20 Z" transform="translate(25, 0)" />
+                    <!-- 6 Pontos Amarelos Chave -->
+                    <circle cx="-30" cy="0" r="3" class="marker-dot" />
+                    <circle cx="-90" cy="-40" r="3" class="marker-dot" />
+                    <circle cx="-140" cy="10" r="3" class="marker-dot" />
+                    <circle cx="30" cy="0" r="3" class="marker-dot" />
+                    <circle cx="90" cy="-40" r="3" class="marker-dot" />
+                    <circle cx="140" cy="10" r="3" class="marker-dot" />
                 </g>
             </svg>
         </div>
 
-        <!-- UI Components -->
         <div class="fixed inset-0 z-20 pointer-events-none flex flex-col justify-between p-6">
-            <!-- Top Header -->
             <div class="flex justify-between items-start pointer-events-auto">
                 <div class="glass-panel px-5 py-3 rounded-3xl shadow-xl">
-                    <div class="text-amber-500 font-black italic tracking-tighter text-xl leading-none">BROW MAP PRO</div>
+                    <div class="text-yellow-400 font-black italic tracking-tighter text-xl leading-none">BROW MAP PRO</div>
                     <div class="flex items-center gap-1.5 mt-1">
                         <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                        <span class="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">Digital Mirror Active</span>
+                        <span id="camera-status" class="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">Active Mapping</span>
                     </div>
                 </div>
-                <button id="btn-snap" class="w-14 h-14 bg-white text-black rounded-3xl flex items-center justify-center shadow-2xl active:scale-90 transition-transform">
-                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" />
-                    </svg>
+                <button id="btn-flip" class="w-14 h-14 glass-panel text-white rounded-3xl flex items-center justify-center shadow-2xl active:scale-90 transition-transform">
+                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
             </div>
 
-            <!-- Bottom Controller Panel -->
             <div class="pointer-events-auto safe-area-bottom">
                 <div class="glass-panel p-8 rounded-[3rem] space-y-8 max-w-sm mx-auto shadow-2xl">
-                    <!-- Adjustment Sliders -->
                     <div class="space-y-6">
                         <div class="space-y-3">
-                            <div class="flex justify-between items-center text-[10px] font-black uppercase text-zinc-500 tracking-widest px-1">
-                                <span>Alinhamento Vertical</span>
-                                <span id="val-y" class="text-amber-500">0</span>
-                            </div>
+                            <div class="flex justify-between items-center text-[10px] font-black uppercase text-zinc-500 tracking-widest px-1"><span>Posição Vertical</span><span id="val-y" class="text-yellow-400">0</span></div>
                             <input type="range" id="range-y" min="-250" max="250" value="0">
                         </div>
-
                         <div class="space-y-3">
-                            <div class="flex justify-between items-center text-[10px] font-black uppercase text-zinc-500 tracking-widest px-1">
-                                <span>Escala / Zoom</span>
-                                <span id="val-scale" class="text-amber-500">1.00</span>
-                            </div>
+                            <div class="flex justify-between items-center text-[10px] font-black uppercase text-zinc-500 tracking-widest px-1"><span>Escala Facial</span><span id="val-scale" class="text-yellow-400">1.00</span></div>
                             <input type="range" id="range-scale" min="0.5" max="2.5" step="0.01" value="1.0">
                         </div>
                     </div>
-
-                    <!-- Quick Actions -->
                     <div class="grid grid-cols-2 gap-3">
-                        <button id="btn-guides" class="py-4 bg-zinc-800 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 active:bg-zinc-700 transition-colors">Guias: ON</button>
-                        <button id="btn-reset" class="py-4 bg-zinc-800 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 active:bg-zinc-700 transition-colors">Resetar</button>
+                        <button id="btn-snap" class="py-4 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center justify-center gap-2">Capture</button>
+                        <button id="btn-reset" class="py-4 bg-zinc-800 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 active:bg-zinc-700 transition-colors">Reset</button>
                     </div>
                 </div>
             </div>
@@ -178,137 +114,44 @@
     <canvas id="snapshot-canvas" class="hidden"></canvas>
 
     <script>
-        const state = { y: 0, scale: 1.0, guidesActive: true };
+        const state = { y: 0, scale: 1.0, facingMode: 'user' };
         const dom = {
-            splash: document.getElementById('splash'),
-            appContent: document.getElementById('app-content'),
-            btnActivate: document.getElementById('btn-activate'),
-            video: document.getElementById('video-feed'),
-            errorBox: document.getElementById('error-box'),
-            errorText: document.getElementById('error-text'),
-            transformGroup: document.getElementById('transform-group'),
-            rangeY: document.getElementById('range-y'),
-            rangeScale: document.getElementById('range-scale'),
-            valY: document.getElementById('val-y'),
-            valScale: document.getElementById('val-scale'),
-            btnGuides: document.getElementById('btn-guides'),
-            btnReset: document.getElementById('btn-reset'),
-            btnSnap: document.getElementById('btn-snap'),
+            splash: document.getElementById('splash'), appContent: document.getElementById('app-content'),
+            btnActivate: document.getElementById('btn-activate'), video: document.getElementById('video-feed'),
+            transformGroup: document.getElementById('transform-group'), rangeY: document.getElementById('range-y'),
+            rangeScale: document.getElementById('range-scale'), valY: document.getElementById('val-y'),
+            valScale: document.getElementById('val-scale'), btnReset: document.getElementById('btn-reset'),
+            btnSnap: document.getElementById('btn-snap'), btnFlip: document.getElementById('btn-flip'),
             canvas: document.getElementById('snapshot-canvas')
         };
 
-        // --- Camera Engine ---
         async function startCamera() {
-            dom.btnActivate.innerText = "Sincronizando Sensor...";
-            dom.btnActivate.disabled = true;
-
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "user",
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    },
-                    audio: false
-                });
-
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.facingMode, width: 1280, height: 720 }, audio: false });
                 dom.video.srcObject = stream;
-                
+                dom.video.classList.toggle('mirrored', state.facingMode === 'user');
                 dom.video.onloadedmetadata = () => {
                     dom.splash.classList.add('opacity-0');
-                    setTimeout(() => {
-                        dom.splash.classList.add('hidden');
-                        dom.appContent.classList.remove('hidden');
-                        setTimeout(() => dom.appContent.classList.add('opacity-100'), 50);
-                    }, 500);
+                    setTimeout(() => { dom.splash.classList.add('hidden'); dom.appContent.classList.remove('hidden'); setTimeout(() => dom.appContent.classList.add('opacity-100'), 50); }, 500);
                 };
-
-            } catch (err) {
-                console.error("Camera Error:", err);
-                dom.errorBox.classList.remove('hidden');
-                dom.btnActivate.innerText = "Erro Crítico";
-                
-                if (err.name === 'NotAllowedError') {
-                    dom.errorText.innerText = "Permissão negada. Ative a câmera no ícone de cadeado do navegador.";
-                } else {
-                    dom.errorText.innerText = "Hardware não detectado ou ocupado por outro aplicativo.";
-                }
-            }
+            } catch (err) { alert("Erro ao acessar câmera: " + err.message); }
         }
 
         dom.btnActivate.onclick = startCamera;
-
-        // --- Visagism Engine ---
         function updateTransform() {
             dom.transformGroup.setAttribute('transform', `translate(200, ${250 + state.y}) scale(${state.scale})`);
-            dom.valY.innerText = state.y;
-            dom.valScale.innerText = state.scale.toFixed(2);
+            dom.valY.innerText = state.y; dom.valScale.innerText = state.scale.toFixed(2);
         }
-
-        dom.rangeY.oninput = (e) => {
-            state.y = parseInt(e.target.value);
-            updateTransform();
-        };
-
-        dom.rangeScale.oninput = (e) => {
-            state.scale = parseFloat(e.target.value);
-            updateTransform();
-        };
-
-        dom.btnGuides.onclick = () => {
-            state.guidesActive = !state.guidesActive;
-            dom.transformGroup.style.display = state.guidesActive ? 'block' : 'none';
-            dom.btnGuides.innerText = `Guias: ${state.guidesActive ? 'ON' : 'OFF'}`;
-            dom.btnGuides.style.color = state.guidesActive ? '#f59e0b' : '#555';
-        };
-
-        dom.btnReset.onclick = () => {
-            state.y = 0; state.scale = 1.0;
-            dom.rangeY.value = 0; dom.rangeScale.value = 1.0;
-            updateTransform();
-        };
-
-        // Touch Drag Logic for Fine Adjustment
-        let isDragging = false, lastY = 0;
-        document.body.addEventListener('touchstart', (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
-            isDragging = true; lastY = e.touches[0].clientY;
-        });
-
-        document.body.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
-            const deltaY = (e.touches[0].clientY - lastY) * 0.5;
-            state.y += deltaY;
-            lastY = e.touches[0].clientY;
-            dom.rangeY.value = state.y;
-            updateTransform();
-        });
-
-        document.body.addEventListener('touchend', () => isDragging = false);
-
-        // Snapshot Logic
+        dom.rangeY.oninput = (e) => { state.y = parseInt(e.target.value); updateTransform(); };
+        dom.rangeScale.oninput = (e) => { state.scale = parseFloat(e.target.value); updateTransform(); };
+        dom.btnReset.onclick = () => { state.y = 0; state.scale = 1.0; dom.rangeY.value = 0; dom.rangeScale.value = 1.0; updateTransform(); };
+        dom.btnFlip.onclick = () => { state.facingMode = state.facingMode === 'user' ? 'environment' : 'user'; startCamera(); };
         dom.btnSnap.onclick = () => {
             const ctx = dom.canvas.getContext('2d');
-            dom.canvas.width = dom.video.videoWidth;
-            dom.canvas.height = dom.video.videoHeight;
-            
-            // Mirror flip mirror view for selfie capture
-            ctx.translate(dom.canvas.width, 0);
-            ctx.scale(-1, 1);
+            dom.canvas.width = dom.video.videoWidth; dom.canvas.height = dom.video.videoHeight;
+            if (state.facingMode === 'user') { ctx.translate(dom.canvas.width, 0); ctx.scale(-1, 1); }
             ctx.drawImage(dom.video, 0, 0);
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-            // Flash effect
-            const flash = document.createElement('div');
-            flash.className = 'fixed inset-0 bg-white z-[200] pointer-events-none opacity-100 transition-opacity duration-300';
-            document.body.appendChild(flash);
-            setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 300); }, 50);
-
-            // Trigger download
-            const link = document.createElement('a');
-            link.download = `browmap-snapshot-${Date.now()}.png`;
-            link.href = dom.canvas.toDataURL('image/png');
-            link.click();
+            const link = document.createElement('a'); link.download = `mapping-${Date.now()}.png`; link.href = dom.canvas.toDataURL('image/png'); link.click();
         };
     </script>
 </body>
