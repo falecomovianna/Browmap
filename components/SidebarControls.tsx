@@ -161,8 +161,8 @@ const SidebarControls: React.FC<SidebarControlsProps> = ({
 
         {activeMode === 'position' && (
           <div className="space-y-2">
-            <Slider label="Eixo Vertical" value={getDisplayValue('posY')} min={-400} max={400} step={1} onChange={(v: number) => updateValue('posY', v)} />
-            <Slider label="Eixo Horizontal" value={getDisplayValue('posX')} min={-400} max={400} step={1} onChange={(v: number) => updateValue('posX', v)} />
+            <Slider label="Eixo Vertical" value={getDisplayValue('posY')} min={-500} max={500} step={1} onChange={(v: number) => updateValue('posY', v)} />
+            <Slider label="Eixo Horizontal" value={getDisplayValue('posX')} min={-500} max={500} step={1} onChange={(v: number) => updateValue('posX', v)} />
             <Slider label="Zoom / Escala" value={getDisplayValue('scale')} min={0.2} max={4.0} step={0.01} precision={2} onChange={(v: number) => updateValue('scale', v)} />
             <Slider label="Rotação" value={getDisplayValue('rotation')} min={-90} max={90} step={0.5} onChange={(v: number) => updateValue('rotation', v)} />
             {config.targetSide === 'both' && <Slider label="Distância Central" value={config.spacing} min={0} max={300} step={1} onChange={(v: number) => updateValue('spacing', v)} />}
