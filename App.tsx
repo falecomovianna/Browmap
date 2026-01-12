@@ -1,6 +1,6 @@
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import CameraView from './components/CameraView';
+import React, { useState, useRef, useEffect } from 'react';
+import CameraView, { CameraViewHandle } from './components/CameraView';
 import EyebrowOverlay from './components/EyebrowOverlay';
 import SidebarControls from './components/SidebarControls';
 import { INITIAL_BROW_CONFIG } from './constants';
@@ -23,11 +23,12 @@ const App: React.FC = () => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [draggingHandle, setDraggingHandle] = useState<ActiveHandle | null>(null);
   
+  const cameraRef = useRef<CameraViewHandle>(null);
+  const overlayRef = useRef<SVGSVGElement>(null);
+
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth > 1024) {
-        setIsSidebarOpen(true);
-      }
+      if (window.innerWidth > 1024) setIsSidebarOpen(true);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -39,143 +40,85 @@ const App: React.FC = () => {
       stream.getTracks().forEach(track => track.stop());
       setHasPermission(true);
     } catch (err: any) {
-      console.error("Permissão negada:", err);
       setHasPermission(false);
     }
   };
 
-  useEffect(() => {
-    if (navigator.permissions && (navigator.permissions as any).query) {
-      (navigator.permissions as any).query({ name: 'camera' }).then((status: any) => {
-        if (status.state === 'granted') setHasPermission(true);
-      }).catch(() => {});
+  const captureSnapshot = async () => {
+    const video = cameraRef.current?.getVideoElement();
+    if (!video) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 1. Desenha o vídeo (com espelhamento se necessário)
+    if (config.mirror) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
     }
-  }, []);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (config.mirror) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
+    // 2. Converte SVG para imagem e desenha por cima
+    const svgData = new XMLSerializer().serializeToString(document.querySelector('svg')!);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `browmap-snapshot-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+      URL.revokeObjectURL(url);
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    };
+    img.src = url;
+  };
 
   const isDragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
-  const initialDist = useRef<number | null>(null);
-  const initialScale = useRef<number>(1);
-  const initialAngle = useRef<number | null>(null);
-  const initialRotation = useRef<number>(0);
-
-  const getEventPos = (e: React.TouchEvent | React.MouseEvent | TouchEvent | MouseEvent) => {
-    if ('touches' in e) {
-      return { x: e.touches[0].clientX, y: e.touches[0].clientY, count: e.touches.length };
-    }
-    return { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY, count: 1 };
-  };
-
-  const findHitHandle = (clientX: number, clientY: number): ActiveHandle | null => {
-    if (!config.showGuides) return null;
-    const svgCenterX = (window.innerWidth + (window.innerWidth > 1024 && isSidebarOpen ? -320 : 0)) / 2 + config.posX;
-    const svgCenterY = window.innerHeight / 2 + config.posY;
-    const sides: ('left' | 'right')[] = ['left', 'right'];
-    const threshold = 50; // Aumentado para melhor uso com o dedo no Android
-
-    for (const side of sides) {
-      const off = side === 'left' ? config.leftOffset : config.rightOffset;
-      const dir = side === 'left' ? -1 : 1;
-      const sideStartX = svgCenterX + (side === 'left' ? -config.spacing/2 : config.spacing/2);
-      
-      const hPoints = [
-        { type: 'pos', x: sideStartX + off.x, y: svgCenterY + off.y },
-        { type: 'thickness', x: sideStartX + off.x, y: svgCenterY + off.y + off.thickness },
-        { type: 'arch', x: sideStartX + off.x + (off.width * 0.62 * dir), y: svgCenterY + off.y - off.archHeight },
-        { type: 'bottomArch', x: sideStartX + off.x + (off.width * 0.60 * dir), y: svgCenterY + off.y - off.archHeight + off.thickness + off.bottomArch },
-        { type: 'width', x: sideStartX + off.x + (off.width * dir), y: svgCenterY + off.y + (off.archHeight * 0.4) },
-      ];
-
-      for (const hp of hPoints) {
-        const dist = Math.hypot(hp.x - clientX, hp.y - clientY);
-        if (dist < threshold) return { side, type: hp.type as any };
-      }
-    }
-    return null;
-  };
 
   const onStart = (e: React.TouchEvent | React.MouseEvent) => {
-    const { x, y, count } = getEventPos(e);
-    if (x > window.innerWidth - (isSidebarOpen ? 320 : 0)) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    if (clientX > window.innerWidth - (isSidebarOpen ? 320 : 0)) return;
 
-    const hit = findHitHandle(x, y);
-    if (hit) {
-      if (navigator.vibrate) navigator.vibrate(10);
-      setDraggingHandle(hit);
-      lastPos.current = { x, y };
-      return;
-    }
-
-    if (count === 1) {
-      isDragging.current = true;
-      lastPos.current = { x, y };
-    } else if ('touches' in e && e.touches.length === 2) {
-      isDragging.current = false;
-      const d = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-      initialDist.current = d;
-      initialScale.current = config.targetSide === 'both' ? config.scale : (config.targetSide === 'left' ? config.leftOffset.scale : config.rightOffset.scale);
-      initialAngle.current = Math.atan2(e.touches[1].clientY - e.touches[0].clientY, e.touches[1].clientX - e.touches[0].clientX) * 180 / Math.PI;
-      initialRotation.current = config.targetSide === 'both' ? config.rotation : (config.targetSide === 'left' ? config.leftOffset.rotation : config.rightOffset.rotation);
-    }
+    isDragging.current = true;
+    lastPos.current = { x: clientX, y: clientY };
   };
 
   const onMove = (e: React.TouchEvent | React.MouseEvent) => {
-    const { x, y, count } = getEventPos(e);
-    const dx = x - lastPos.current.x;
-    const dy = y - lastPos.current.y;
+    if (!isDragging.current) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    const dx = clientX - lastPos.current.x;
+    const dy = clientY - lastPos.current.y;
 
-    if (draggingHandle) {
-      const { side, type } = draggingHandle;
-      const sideKey = side === 'left' ? 'leftOffset' : 'rightOffset';
-      const dir = side === 'left' ? -1 : 1;
-      setConfig(prev => {
-        const newSide = { ...prev[sideKey] };
-        if (type === 'pos') { newSide.x += dx; newSide.y += dy; }
-        else if (type === 'width') { newSide.width = Math.max(40, newSide.width + dx * dir); }
-        else if (type === 'arch') { newSide.archHeight = Math.max(0, newSide.archHeight - dy); }
-        else if (type === 'bottomArch') { newSide.bottomArch = Math.max(-30, newSide.bottomArch + dy); }
-        else if (type === 'thickness') { newSide.thickness = Math.max(2, newSide.thickness + dy); }
-        return { ...prev, [sideKey]: newSide };
-      });
-      lastPos.current = { x, y };
-    } else if (count === 1 && isDragging.current) {
-      if (config.targetSide === 'both') {
-        setConfig(prev => ({ ...prev, posX: prev.posX + dx, posY: prev.posY + dy }));
-      } else {
-        const sideKey = config.targetSide === 'left' ? 'leftOffset' : 'rightOffset';
-        setConfig(prev => ({ ...prev, [sideKey]: { ...prev[sideKey], x: prev[sideKey].x + dx, y: prev[sideKey].y + dy } }));
-      }
-      lastPos.current = { x, y };
-    } else if ('touches' in e && e.touches.length === 2 && initialDist.current !== null) {
-      const currentDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-      const scaleFactor = currentDist / initialDist.current;
-      const newScale = Math.min(Math.max(initialScale.current * scaleFactor, 0.2), 5.0);
-      const currentAngle = Math.atan2(e.touches[1].clientY - e.touches[0].clientY, e.touches[1].clientX - e.touches[0].clientX) * 180 / Math.PI;
-      const angleDiff = currentAngle - (initialAngle.current || 0);
-      const newRotation = initialRotation.current + angleDiff;
-      if (config.targetSide === 'both') {
-        setConfig(prev => ({ ...prev, scale: newScale, rotation: newRotation }));
-      } else {
-        const sideKey = config.targetSide === 'left' ? 'leftOffset' : 'rightOffset';
-        setConfig(prev => ({ ...prev, [sideKey]: { ...prev[sideKey], scale: newScale, rotation: newRotation } }));
-      }
+    if (config.targetSide === 'both') {
+      setConfig(prev => ({ ...prev, posX: prev.posX + dx, posY: prev.posY + dy }));
+    } else {
+      const sideKey = config.targetSide === 'left' ? 'leftOffset' : 'rightOffset';
+      setConfig(prev => ({ ...prev, [sideKey]: { ...prev[sideKey], x: prev[sideKey].x + dx, y: prev[sideKey].y + dy } }));
     }
+    lastPos.current = { x: clientX, y: clientY };
   };
 
   if (hasPermission === false || hasPermission === null) {
     return (
       <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-12 text-center">
-        <div className="w-24 h-24 bg-amber-500/10 rounded-[40px] flex items-center justify-center mb-8 border border-amber-500/20 shadow-2xl">
-          <svg className="w-12 h-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-          </svg>
-        </div>
-        <h1 className="text-amber-500 font-black text-2xl italic tracking-tighter mb-4">BROW MAP PRO</h1>
-        <p className="text-zinc-500 text-xs font-bold mb-12 max-w-xs leading-relaxed uppercase tracking-widest">
-          Inicie o visor profissional de visagismo com acesso à câmera.
-        </p>
-        <button onClick={requestCameraPermission} className="w-full max-w-xs py-5 bg-amber-500 text-black text-[10px] font-black uppercase rounded-3xl shadow-2xl active:scale-95 transition-all">
-          Permitir Câmera
+        <h1 className="text-amber-500 font-black text-2xl italic mb-6">BROW MAP PRO</h1>
+        <button onClick={requestCameraPermission} className="px-8 py-5 bg-amber-500 text-black text-[10px] font-black uppercase rounded-3xl shadow-2xl">
+          Iniciar Câmera
         </button>
       </div>
     );
@@ -184,62 +127,36 @@ const App: React.FC = () => {
   return (
     <div className="relative w-full h-full flex overflow-hidden bg-black font-sans text-zinc-100 select-none">
       <div 
-        className={`relative flex-1 transition-all duration-500 bg-transparent cursor-crosshair h-full overflow-hidden ${isSidebarOpen && window.innerWidth > 1024 ? 'mr-[320px]' : ''}`}
-        onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={() => { isDragging.current = false; setDraggingHandle(null); initialDist.current = null; }}
-        onMouseDown={onStart} onMouseMove={onMove} onMouseUp={() => { isDragging.current = false; setDraggingHandle(null); }}
+        className={`relative flex-1 transition-all duration-500 bg-transparent h-full overflow-hidden ${isSidebarOpen && window.innerWidth > 1024 ? 'mr-[320px]' : ''}`}
+        onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={() => isDragging.current = false}
+        onMouseDown={onStart} onMouseMove={onMove} onMouseUp={() => isDragging.current = false}
       >
-        <CameraView deviceId={selectedCamera} mirror={config.mirror} />
+        <CameraView ref={cameraRef} deviceId={selectedCamera} mirror={config.mirror} />
         <EyebrowOverlay config={config} activeHandle={draggingHandle} />
 
         <div className="absolute top-10 left-10 z-30 pointer-events-none">
-          <div className="flex flex-col">
-            <span className="text-amber-500 font-black text-base italic tracking-tighter drop-shadow-2xl">BrowMap Pro</span>
-            <span className="text-[7px] text-white/50 font-bold uppercase tracking-[0.4em]">Visagismo Digital</span>
-          </div>
+          <span className="text-amber-500 font-black text-base italic tracking-tighter drop-shadow-2xl">BrowMap Pro</span>
         </div>
 
         {(!isSidebarOpen || window.innerWidth <= 1024) && (
-          <div className="absolute left-10 bottom-12 flex flex-col gap-4 z-30">
-            {['left', 'both', 'right'].map(s => (
-              <button key={s} onClick={() => {
-                setConfig(p => ({ ...p, targetSide: s as any }));
-                if (navigator.vibrate) navigator.vibrate(5);
-              }}
-                className={`w-12 h-12 rounded-2xl border flex items-center justify-center transition-all ${config.targetSide === s ? 'bg-amber-500 border-transparent text-black scale-110 shadow-xl' : 'bg-black/60 border-white/10 text-white'}`}>
-                <span className="text-[10px] font-black uppercase">{s === 'both' ? '∞' : s === 'left' ? 'L' : 'R'}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {(!isSidebarOpen || window.innerWidth <= 1024) && (
           <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-            className="absolute top-10 right-10 p-5 bg-amber-500 text-black rounded-[28px] shadow-2xl active:scale-90 z-30 transition-transform"
+            onClick={() => setIsSidebarOpen(true)} 
+            className="absolute top-10 right-10 p-5 bg-amber-500 text-black rounded-3xl shadow-2xl z-30"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d={isSidebarOpen ? "M6 18L18 6" : "M4 6h16M4 12h16m-7 6h7"} />
-            </svg>
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 6h16M4 12h16m-7 6h7" /></svg>
           </button>
         )}
       </div>
 
-      {isSidebarOpen && window.innerWidth <= 1024 && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={() => setIsSidebarOpen(false)} />
-      )}
-      
-      <div className={`
-        fixed right-0 top-0 bottom-0 z-50 transition-all duration-500 ease-out h-full 
-        bg-transparent
-        ${isSidebarOpen ? 'w-[320px] translate-x-0' : 'w-0 translate-x-full'}
-      `}>
+      <div className={`fixed right-0 top-0 bottom-0 z-50 transition-all duration-500 ease-out h-full ${isSidebarOpen ? 'w-[320px] translate-x-0' : 'w-0 translate-x-full'}`}>
         <SidebarControls 
           config={config} 
           setConfig={setConfig} 
           activeMode={activeMode} 
           setActiveMode={setActiveMode} 
           resetConfig={() => setConfig(INITIAL_BROW_CONFIG)} 
-          onSave={() => localStorage.setItem(STORAGE_KEY, JSON.stringify(config))} 
+          onSave={() => localStorage.setItem(STORAGE_KEY, JSON.stringify(config))}
+          onSnapshot={captureSnapshot}
           selectedCamera={selectedCamera} 
           setSelectedCamera={setSelectedCamera} 
           onClose={() => setIsSidebarOpen(false)} 
