@@ -63,7 +63,7 @@ const App: React.FC = () => {
     if ('touches' in e) {
       return { x: e.touches[0].clientX, y: e.touches[0].clientY, count: e.touches.length };
     }
-    return { x: e.clientX, y: e.clientY, count: 1 };
+    return { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY, count: 1 };
   };
 
   const findHitHandle = (clientX: number, clientY: number): ActiveHandle | null => {
@@ -71,7 +71,7 @@ const App: React.FC = () => {
     const svgCenterX = (window.innerWidth + (window.innerWidth > 1024 && isSidebarOpen ? -320 : 0)) / 2 + config.posX;
     const svgCenterY = window.innerHeight / 2 + config.posY;
     const sides: ('left' | 'right')[] = ['left', 'right'];
-    const threshold = 45; 
+    const threshold = 50; // Aumentado para melhor uso com o dedo no Android
 
     for (const side of sides) {
       const off = side === 'left' ? config.leftOffset : config.rightOffset;
@@ -100,6 +100,7 @@ const App: React.FC = () => {
 
     const hit = findHitHandle(x, y);
     if (hit) {
+      if (navigator.vibrate) navigator.vibrate(10);
       setDraggingHandle(hit);
       lastPos.current = { x, y };
       return;
@@ -163,18 +164,18 @@ const App: React.FC = () => {
 
   if (hasPermission === false || hasPermission === null) {
     return (
-      <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center mb-8 border border-amber-500/20">
+      <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-12 text-center">
+        <div className="w-24 h-24 bg-amber-500/10 rounded-[40px] flex items-center justify-center mb-8 border border-amber-500/20 shadow-2xl">
           <svg className="w-12 h-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
           </svg>
         </div>
         <h1 className="text-amber-500 font-black text-2xl italic tracking-tighter mb-4">BROW MAP PRO</h1>
-        <p className="text-zinc-400 text-xs uppercase tracking-[0.2em] font-bold mb-10 max-w-xs leading-relaxed">
-          {hasPermission === false ? "Permissão negada. Ative a câmera no seu navegador ou configurações." : "Iniciando visão profissional..."}
+        <p className="text-zinc-500 text-xs font-bold mb-12 max-w-xs leading-relaxed uppercase tracking-widest">
+          Inicie o visor profissional de visagismo com acesso à câmera.
         </p>
-        <button onClick={requestCameraPermission} className="w-full max-w-xs py-5 bg-amber-500 text-black text-xs font-black uppercase rounded-2xl shadow-xl active:scale-95 transition-all">
-          Permitir Acesso
+        <button onClick={requestCameraPermission} className="w-full max-w-xs py-5 bg-amber-500 text-black text-[10px] font-black uppercase rounded-3xl shadow-2xl active:scale-95 transition-all">
+          Permitir Câmera
         </button>
       </div>
     );
@@ -183,26 +184,29 @@ const App: React.FC = () => {
   return (
     <div className="relative w-full h-full flex overflow-hidden bg-black font-sans text-zinc-100 select-none">
       <div 
-        className={`relative flex-1 transition-all duration-500 bg-transparent cursor-move h-full overflow-hidden ${isSidebarOpen && window.innerWidth > 1024 ? 'mr-[320px]' : ''}`}
+        className={`relative flex-1 transition-all duration-500 bg-transparent cursor-crosshair h-full overflow-hidden ${isSidebarOpen && window.innerWidth > 1024 ? 'mr-[320px]' : ''}`}
         onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={() => { isDragging.current = false; setDraggingHandle(null); initialDist.current = null; }}
         onMouseDown={onStart} onMouseMove={onMove} onMouseUp={() => { isDragging.current = false; setDraggingHandle(null); }}
       >
         <CameraView deviceId={selectedCamera} mirror={config.mirror} />
         <EyebrowOverlay config={config} activeHandle={draggingHandle} />
 
-        <div className="absolute top-8 left-8 z-30 pointer-events-none">
+        <div className="absolute top-10 left-10 z-30 pointer-events-none">
           <div className="flex flex-col">
-            <span className="text-amber-500 font-black text-sm italic tracking-tighter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">BrowMap Pro</span>
-            <span className="text-[7px] text-white font-bold uppercase tracking-[0.3em] opacity-80">Full Lens Edition</span>
+            <span className="text-amber-500 font-black text-base italic tracking-tighter drop-shadow-2xl">BrowMap Pro</span>
+            <span className="text-[7px] text-white/50 font-bold uppercase tracking-[0.4em]">Visagismo Digital</span>
           </div>
         </div>
 
         {(!isSidebarOpen || window.innerWidth <= 1024) && (
-          <div className="absolute left-8 bottom-10 flex flex-col gap-3 z-30">
+          <div className="absolute left-10 bottom-12 flex flex-col gap-4 z-30">
             {['left', 'both', 'right'].map(s => (
-              <button key={s} onClick={() => setConfig(p => ({ ...p, targetSide: s as any }))}
-                className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${config.targetSide === s ? 'bg-amber-500 border-amber-400 text-black scale-110 shadow-lg' : 'bg-black/40 border-white/20 text-white'}`}>
-                <span className="text-[8px] font-black uppercase">{s === 'both' ? '∞' : s === 'left' ? 'L' : 'R'}</span>
+              <button key={s} onClick={() => {
+                setConfig(p => ({ ...p, targetSide: s as any }));
+                if (navigator.vibrate) navigator.vibrate(5);
+              }}
+                className={`w-12 h-12 rounded-2xl border flex items-center justify-center transition-all ${config.targetSide === s ? 'bg-amber-500 border-transparent text-black scale-110 shadow-xl' : 'bg-black/60 border-white/10 text-white'}`}>
+                <span className="text-[10px] font-black uppercase">{s === 'both' ? '∞' : s === 'left' ? 'L' : 'R'}</span>
               </button>
             ))}
           </div>
@@ -211,22 +215,22 @@ const App: React.FC = () => {
         {(!isSidebarOpen || window.innerWidth <= 1024) && (
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-            className="absolute top-8 right-8 p-5 bg-amber-500 text-black rounded-3xl shadow-xl active:scale-90 z-30 transition-transform"
+            className="absolute top-10 right-10 p-5 bg-amber-500 text-black rounded-[28px] shadow-2xl active:scale-90 z-30 transition-transform"
           >
-            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d={isSidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16m-7 6h7"} />
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d={isSidebarOpen ? "M6 18L18 6" : "M4 6h16M4 12h16m-7 6h7"} />
             </svg>
           </button>
         )}
       </div>
 
       {isSidebarOpen && window.innerWidth <= 1024 && (
-        <div className="fixed inset-0 bg-transparent z-40" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={() => setIsSidebarOpen(false)} />
       )}
       
       <div className={`
         fixed right-0 top-0 bottom-0 z-50 transition-all duration-500 ease-out h-full 
-        bg-transparent border-l border-white/5
+        bg-transparent
         ${isSidebarOpen ? 'w-[320px] translate-x-0' : 'w-0 translate-x-full'}
       `}>
         <SidebarControls 

@@ -17,7 +17,7 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config, activeHandle })
 
   const s = spacing / 2;
 
-  // Função para criar o formato geométrico (Mapping Style da Foto)
+  // Função para criar o formato geométrico (Mapping Style Profissional)
   const createMappingPath = (side: 'left' | 'right', offset: SideOffset) => {
     const isLeft = side === 'left';
     const dir = isLeft ? -1 : 1;
@@ -67,26 +67,25 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config, activeHandle })
     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
       <svg 
         viewBox="-250 -250 500 500" 
-        className="w-full h-full overflow-visible"
+        className="w-full h-full overflow-visible transition-all duration-300"
         style={{ transform: `translate(${posX}px, ${posY}px) rotate(${rotation}deg) scale(${scale})` }}
       >
         {showVisagismGrid && (
-          <g stroke="#000" strokeWidth="0.8" opacity="0.6">
-            {/* Linhas Verticais e Grid de Cruzamento da Foto */}
-            <line x1={l.topStart.x} y1="-300" x2={l.topStart.x} y2="300" strokeWidth="1" />
-            <line x1={r.topStart.x} y1="-300" x2={r.topStart.x} y2="300" strokeWidth="1" />
+          <g stroke={color} strokeWidth="0.5" opacity="0.3">
+            {/* Linhas Verticais Mestras */}
+            <line x1={l.topStart.x} y1="-300" x2={l.topStart.x} y2="300" strokeWidth="0.8" />
+            <line x1={r.topStart.x} y1="-300" x2={r.topStart.x} y2="300" strokeWidth="0.8" />
             
-            {/* Triângulo de Base do Nariz (V-Shape) */}
-            <line x1="0" y1="280" x2={l.tail.x} y2={l.tail.y} />
-            <line x1="0" y1="280" x2={r.tail.x} y2={r.tail.y} />
-            <line x1="0" y1="280" x2={l.topStart.x} y2={l.topStart.y} />
-            <line x1="0" y1="280" x2={r.topStart.x} y2={r.topStart.y} />
+            {/* Guias Horizontais de Simetria */}
+            <line x1="-300" y1={l.topStart.y} x2="300" y2={l.topStart.y} strokeDasharray="5,5" />
+            <line x1="-300" y1={l.topArch.y} x2="300" y2={l.topArch.y} strokeDasharray="3,3" />
+            <line x1="-300" y1={l.tail.y} x2="300" y2={l.tail.y} strokeDasharray="3,3" />
 
-            {/* Cruzamentos Centrais Forehead */}
-            <line x1={l.topStart.x} y1={l.topStart.y} x2={r.topArch.x} y2={r.topArch.y} strokeWidth="0.4" />
-            <line x1={r.topStart.x} y1={r.topStart.y} x2={l.topArch.x} y2={l.topArch.y} strokeWidth="0.4" />
-            <line x1={l.topStart.x} y1={l.topStart.y - 30} x2={r.topArch.x} y2={r.topArch.y} strokeWidth="0.3" strokeDasharray="2,2" />
-            <line x1={r.topStart.x} y1={r.topStart.y - 30} x2={l.topArch.x} y2={l.topArch.y} strokeWidth="0.3" strokeDasharray="2,2" />
+            {/* Triângulos de Visagismo (Foco no Nariz/Olhos) */}
+            <line x1="0" y1="280" x2={l.tail.x} y2={l.tail.y} strokeWidth="0.8" />
+            <line x1="0" y1="280" x2={r.tail.x} y2={r.tail.y} strokeWidth="0.8" />
+            <line x1="0" y1="280" x2={l.topStart.x} y2={l.topStart.y} strokeWidth="1" />
+            <line x1="0" y1="280" x2={r.topStart.x} y2={r.topStart.y} strokeWidth="1" />
           </g>
         )}
 
@@ -96,16 +95,17 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config, activeHandle })
               <path 
                 d={createMappingPath(side as 'left' | 'right', side === 'left' ? leftOffset : rightOffset)} 
                 stroke={color} 
-                strokeWidth={targetSide === side ? "2.5" : "1.2"}
+                strokeWidth={targetSide === side ? "2.8" : "1.4"}
                 fill={color}
-                fillOpacity="0.05"
+                fillOpacity="0.05" // Reduzido conforme solicitado para 0.05 para transparência profissional
+                className="transition-all duration-300"
               />
             </g>
           ))}
         </g>
 
         {showGuides && (
-          <g fill={color} stroke="#000" strokeWidth="0.6">
+          <g fill={color} stroke="#000" strokeWidth="0.7">
             {['left', 'right'].map((side) => {
               const s = side as 'left' | 'right';
               const off = s === 'left' ? leftOffset : rightOffset;
@@ -113,10 +113,11 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config, activeHandle })
               const isActiveSide = targetSide === 'both' || targetSide === s;
               const isType = (t: string) => activeHandle?.side === s && activeHandle?.type === t;
               
-              const radius = (t: string) => isType(t) ? handleSize * 1.6 : handleSize;
+              const radius = (t: string) => isType(t) ? handleSize * 2.2 : handleSize;
 
               return (
                 <g key={s} transform={getSideTransform(s)} opacity={isActiveSide ? 1 : 0.4}>
+                  {/* Pontos de Ajuste Ativos */}
                   <circle cx={0} cy={0} r={radius('pos')} />
                   <circle cx={0} cy={off.thickness} r={radius('thickness')} />
                   <circle cx={off.width * 0.62 * dir} cy={-off.archHeight} r={radius('arch')} />
@@ -125,16 +126,6 @@ const EyebrowOverlay: React.FC<EyebrowOverlayProps> = ({ config, activeHandle })
                 </g>
               );
             })}
-
-            {/* Pontos Amarelos de Intersecção Central (Yellow Dots) */}
-            {showVisagismGrid && (
-              <g opacity="0.9">
-                 <circle cx="0" cy={l.topStart.y - 15} r={handleSize * 0.7} />
-                 <circle cx="0" cy={l.topStart.y - 45} r={handleSize * 0.7} />
-                 <circle cx="0" cy={l.topStart.y - 75} r={handleSize * 0.7} />
-                 <circle cx="0" cy={l.topStart.y + 10} r={handleSize * 0.7} />
-              </g>
-            )}
           </g>
         )}
       </svg>
